@@ -1,0 +1,26 @@
+{
+  "nonebot": {
+    "project_name": "",
+    "drivers": "",
+    "adapters": "",
+    "env_superusers": "",
+    "env_nickname": "",
+    "env_command_start": "",
+    "env_command_sep": "",
+    "env_host": "",
+    "env_port": "",
+    "use_run_script": true,
+    "is_windows": true,
+    "redirect_localstore": true,
+    "use_ping": true,
+    "use_web_ui": true,
+    "plugins": "",
+    "packages": ""
+  },
+  "computed": {
+    "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}",
+    "folder_name": "{{ cookiecutter.nonebot.project_name.replace(' ', '-').lower() }}",
+    "ping_plugin_name": "{% if not cookiecutter.nonebot.use_ping %}_{% endif %}ping"
+  },
+  "_extensions": ["nb_cli.extensions.UnJsonifyExtension"]
+}

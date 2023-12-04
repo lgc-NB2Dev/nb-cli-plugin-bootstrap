@@ -12,7 +12,7 @@
 
 # NB-Cli-Plugin-Bootstrap
 
-_✨ 更好用的 NoneBot2 起手项目新建工具 ✨_
+_✨ NoneBot2 更实用的初始项目新建工具 ✨_
 
 <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="python">
 <a href="https://pdm.fming.dev">
@@ -48,8 +48,16 @@ nb self install nb-cli-plugin-bootstrap
 
 ## 🎉 使用
 
+### 创建一个更实用的 NoneBot2 初始项目
+
 ```shell
 nb bootstrap
+```
+
+### 更新当前文件夹项目中的所有适配器和插件
+
+```shell
+nb update-project
 ```
 
 ## 📞 联系

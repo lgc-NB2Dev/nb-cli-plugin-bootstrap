@@ -1,0 +1,37 @@
+[project]
+name = "{{ cookiecutter.computed.project_slug }}"
+version = "0.1.0"
+description = "{{ cookiecutter.computed.project_slug }}"
+requires-python = ">=3.8"
+dependencies = [{% for pkg in cookiecutter.nonebot.packages %}
+    "{{ pkg }}",{% endfor %}
+]
+
+[tool.nonebot]
+### NoneBot 配置 ###
+
+# NoneBot 加载的 Adapter 列表
+# 使用 "nb adapter" 命令来管理
+{% if cookiecutter.nonebot.adapters -%}
+adapters = [{% for adapter in cookiecutter.nonebot.adapters.values() %}
+    { name = "{{ adapter.name }}", module_name = "{{ adapter.module_name }}" },{% endfor %}
+]
+{%- else -%}
+adapters = []
+{%- endif %}
+
+# NoneBot 加载的插件名列表
+# 使用 "nb plugin" 命令来管理，或者手动增删
+{% if cookiecutter.nonebot.plugins -%}
+plugins = [{% for plugin in cookiecutter.nonebot.plugins %}
+    "{{ plugin.replace('-', '_') }}",{% endfor %}
+]
+{%- else -%}
+plugins = []
+{%- endif %}
+
+# NoneBot 加载的插件文件夹列表，会加载这些文件夹下的所有 Python 模块
+plugin_dirs = ["src/plugins"]
+
+# 要加载的 NoneBot 内置插件列表
+builtin_plugins = []

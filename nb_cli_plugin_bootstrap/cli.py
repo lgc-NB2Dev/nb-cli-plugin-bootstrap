@@ -1,17 +1,18 @@
 import click
 from nb_cli.cli import ClickAliasedGroup, run_async
 
-from .handlers.update_project import update_project as update_project_handler
+from .handlers.bootstrap import bootstrap_handler
+from .handlers.update_project import update_project_handler
 
 
 @click.group(
     cls=ClickAliasedGroup,
     invoke_without_command=True,
-    help="创建一个更实用的 NoneBot2 起手项目",
+    help="创建一个更实用的 NoneBot2 初始项目",
 )
 @run_async
 async def bootstrap():
-    click.secho("Working in progress...", fg="yellow")
+    await bootstrap_handler()
 
 
 @click.group(

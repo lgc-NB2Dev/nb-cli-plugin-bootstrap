@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 from typing_extensions import TypeAlias
 
 import click
+from nb_cli.cli.utils import CLI_DEFAULT_STYLE
 from nb_cli.handlers.meta import get_default_python, get_nonebot_config, requires_pip
 from nb_cli.handlers.pip import call_pip_update
 from nb_cli.handlers.project import requires_project_root
@@ -121,7 +122,7 @@ def summary_infos(infos: List[InstallInfoType]) -> str:
 
 @requires_project_root
 @requires_pip
-async def update_project(
+async def update_project_handler(
     *,
     python_path: Optional[str] = None,
     cwd: Optional[Path] = None,  # noqa: ARG001
@@ -140,7 +141,8 @@ async def update_project(
 
     if not await ConfirmPrompt(
         "一键更新所有适配器或插件有可能会导致它们之间不兼容导致报错，请问您是否真的要继续？",
-    ).prompt_async():
+        default_choice=True,
+    ).prompt_async(style=CLI_DEFAULT_STYLE):
         return
 
     infos = []
