@@ -165,15 +165,11 @@ async def configure_web_ui():
         )
 
     click.secho("插件安装成功", fg="green", bold=True)
-    click.secho("接下来，让我们开始配置 webui 插件，请稍等", fg="yellow", bold=True)
+    # click.secho("接下来，让我们开始配置 webui 插件，请稍等", fg="yellow", bold=True)
     proc = await create_process(
         sys.executable,
         "-c",
-        (
-            "import contextlib\n"
-            "with contextlib.suppress(Exception):\n"
-            "    import nb_cli_plugin_webui.app.config"
-        ),
+        "import nb_cli_plugin_webui.app.config",
     )
     await proc.wait()
 
