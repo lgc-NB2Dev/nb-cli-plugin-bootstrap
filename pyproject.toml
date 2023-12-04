@@ -1,0 +1,19 @@
+[project]
+name = "nb-cli-plugin-bootstrap"
+version = "0.1.0"
+description = "A nb-cli plugin for quickly create and bootstrap a NoneBot2 project."
+authors = [{ name = "student_2333", email = "lgc2333@126.com" }]
+dependencies = []
+requires-python = ">=3.8,<4.0"
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.urls]
+homepage = "https://github.com/lgc-NB2Dev/nb-cli-plugin-bootstrap"
+
+[tool.pdm.build]
+includes = []
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
