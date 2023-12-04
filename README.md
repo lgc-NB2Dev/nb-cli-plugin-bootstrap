@@ -12,7 +12,7 @@
 
 # NB-Cli-Plugin-Bootstrap
 
-_✨ NoneBot2 项目快速新建工具 ✨_
+_✨ 更好用的 NoneBot2 起手项目新建工具 ✨_
 
 <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="python">
 <a href="https://pdm.fming.dev">

@@ -1,9 +1,9 @@
 [project]
 name = "nb-cli-plugin-bootstrap"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A nb-cli plugin for quickly create and bootstrap a NoneBot2 project."
 authors = [{ name = "student_2333", email = "lgc2333@126.com" }]
-dependencies = []
+dependencies = ["nb-cli>=1.2.7"]
 requires-python = ">=3.8,<4.0"
 readme = "README.md"
 license = { text = "MIT" }
@@ -11,8 +11,15 @@ license = { text = "MIT" }
 [project.urls]
 homepage = "https://github.com/lgc-NB2Dev/nb-cli-plugin-bootstrap"
 
+[project.entry-points.nb]
+plugin_name = "nb_cli_plugin_bootstrap.plugin:install"
+
 [tool.pdm.build]
 includes = []
+
+[tool.pdm.version]
+source = "file"
+path = "nb_cli_plugin_bootstrap/__init__.py"
 
 [build-system]
 requires = ["pdm-backend"]
