@@ -18,8 +18,8 @@ _✨ NoneBot2 更实用的初始项目新建工具 ✨_
 <a href="https://pdm.fming.dev">
   <img src="https://img.shields.io/badge/pdm-managed-blueviolet" alt="pdm-managed">
 </a>
-<a href="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33ae-a2a1-4b13-9d00-dbd7653ea52d">
-  <img src="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33ae-a2a1-4b13-9d00-dbd7653ea52d.svg" alt="wakatime">
+<a href="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33e5-66c5-4aee-ad15-2d9104d177c4">
+  <img src="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33e5-66c5-4aee-ad15-2d9104d177c4.svg" alt="wakatime">
 </a>
 
 <br />
