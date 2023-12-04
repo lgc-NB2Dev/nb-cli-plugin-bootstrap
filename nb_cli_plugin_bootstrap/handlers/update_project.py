@@ -23,8 +23,8 @@ class SuccessInstallInfo:
 
     def _parse_version(self) -> Optional[str]:
         suc_out = "Successfully installed "
-        if (suc_index := self.stdout.find(suc_out)) != -1:
-            index = self.stdout.find(self.name, suc_index) + len(self.name) + 1
+        if suc_out in self.stdout:
+            index = self.stdout.rfind(self.name) + len(self.name) + 1
             return self.stdout[index : self.stdout.find(" ", index)].strip()
         return None
 

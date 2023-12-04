@@ -36,10 +36,6 @@ _✨ NoneBot2 更实用的初始项目新建工具 ✨_
 
 </div>
 
-## 📖 介绍
-
-这里是插件的详细介绍部分
-
 ## 💿 安装
 
 ```shell
@@ -54,11 +50,26 @@ nb self install nb-cli-plugin-bootstrap
 nb bootstrap
 ```
 
+<details>
+<summary>效果图（点击展开）</summary>
+
+![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/bootstrap.png)
+
+</details>
+
 ### 更新当前文件夹项目中的所有适配器和插件
 
 ```shell
 nb update-project
 ```
+
+<details>
+<summary>效果图（点击展开）</summary>
+
+![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/update-project1.png)
+![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/update-project2.png)
+
+</details>
 
 ## 📞 联系
 
@@ -81,4 +92,6 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
-芝士刚刚发布的插件，还没有更新日志的说 qwq~
+### 0.1.1
+
+- 修复版本号显示不正确的 Bug
