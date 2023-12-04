@@ -38,7 +38,7 @@ class FailInstallInfo:
     def _parse_reason(self) -> Optional[str]:
         nf_out = "No matching distribution found for "
         if (nf_index := self.stderr.find(nf_out)) != -1:
-            index = nf_index + len(nf_out) + 1
+            index = nf_index + len(nf_out)
             pkg = self.stderr[index:].strip()
             return f"包 {pkg} 不存在"
         return "未知原因"
