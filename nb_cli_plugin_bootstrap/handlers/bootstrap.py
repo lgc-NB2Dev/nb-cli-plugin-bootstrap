@@ -141,8 +141,8 @@ async def prompt_bootstrap_context(context: ProjectContext):
 
     if use_run_script:
         use_web_ui = await ConfirmPrompt(
-            "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？",
-            default_choice=True,
+            "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？（该插件缺少教程，仅推荐进阶用户使用）",
+            default_choice=False,
         ).prompt_async(style=CLI_DEFAULT_STYLE)
         context.variables["use_web_ui"] = use_web_ui
 
