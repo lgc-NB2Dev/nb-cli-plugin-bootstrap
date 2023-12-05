@@ -1,6 +1,8 @@
 import asyncio
 import json
 import platform
+import shlex
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -19,6 +21,7 @@ from noneprompt import CheckboxPrompt, Choice, ConfirmPrompt, InputPrompt
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BOOTSTRAP_TEMPLATE_DIR = TEMPLATES_DIR / "bootstrap"
+IS_WINDOWS = "Windows" in platform.system()
 
 
 async def prompt_input_list(prompt: str, **kwargs) -> List[str]:
@@ -99,7 +102,7 @@ async def prompt_bootstrap_context(context: ProjectContext):
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["use_run_script"] = use_run_script
-    context.variables["is_windows"] = "Windows" in platform.system()
+    context.variables["is_windows"] = IS_WINDOWS
 
     redirect_localstore = await ConfirmPrompt(
         "是否将 localstore 插件的存储路径重定向到项目路径下以便于后续迁移 Bot？",
@@ -174,17 +177,9 @@ async def configure_web_ui():
     await proc.wait()
 
 
-async def post_project_render(context: ProjectContext):
+async def post_project_render(context: ProjectContext) -> bool:
     if context.variables["use_web_ui"]:
         await configure_web_ui()
-
-    manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
-    if not await ConfirmPrompt(
-        "是否立即安装项目依赖？",
-        default_choice=True,
-    ).prompt_async(style=CLI_DEFAULT_STYLE):
-        click.secho(manually_install_tip, fg="green")
-        return
 
     use_venv = await ConfirmPrompt(
         "是否新建虚拟环境？",
@@ -199,8 +194,18 @@ async def post_project_render(context: ProjectContext):
             await create_virtualenv(venv_dir, prompt=project_dir_name)
         except Exception:
             click.secho(f"创建虚拟环境失败\n{traceback.format_exc()}", fg="red", bold=True)
-            return
+            return False
         click.secho("创建虚拟环境成功", fg="green", bold=True)
+
+    manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
+    if (not use_venv) or (
+        not await ConfirmPrompt(
+            "是否立即安装项目依赖？",
+            default_choice=True,
+        ).prompt_async(style=CLI_DEFAULT_STYLE)
+    ):
+        click.secho(manually_install_tip, fg="green")
+        return True
 
     click.secho("正在安装项目依赖", fg="yellow")
     config_manager = ConfigManager(working_dir=project_dir, use_venv=use_venv)
@@ -219,7 +224,7 @@ async def post_project_render(context: ProjectContext):
             fg="red",
             bold=True,
         )
-        return
+        return False
 
     builtin_plugins = await list_builtin_plugins(python_path=config_manager.python_path)
     selected_builtin_plugins = [
@@ -234,6 +239,9 @@ async def post_project_render(context: ProjectContext):
             config_manager.add_builtin_plugin(plugin)
     except Exception:
         click.secho(f"启用内置插件失败\n{traceback.format_exc()}", fg="red", bold=True)
+        return False
+
+    return True
 
 
 async def bootstrap_handler():
@@ -241,6 +249,12 @@ async def bootstrap_handler():
     await prompt_common_context(context)
     await prompt_bootstrap_context(context)
 
+    nb_command_list = [sys.executable, "-m", "nb_cli"]
+    context.variables["nb_command"] = (
+        subprocess.list2cmdline(nb_command_list)
+        if IS_WINDOWS
+        else " ".join(shlex.quote(x) for x in nb_command_list)
+    )
     if not next((x for x in context.packages if x.startswith("nonebot2")), None):
         context.packages.insert(0, "nonebot2")
     extra_context = {
@@ -257,5 +271,7 @@ async def bootstrap_handler():
     )
     click.secho(f"成功新建项目 {context.variables['project_name']}", fg="green", bold=True)
 
-    await post_project_render(context)
-    click.secho("项目配置完毕，开始使用吧！", fg="green", bold=True)
+    if await post_project_render(context):
+        click.secho("项目配置完毕，开始使用吧！", fg="green", bold=True)
+    else:
+        click.secho("项目配置失败！你可能需要考虑手动进行后续配置，或重新创建一次项目", fg="red", bold=True)

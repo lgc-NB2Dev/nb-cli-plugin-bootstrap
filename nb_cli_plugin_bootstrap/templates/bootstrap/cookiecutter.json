@@ -15,7 +15,8 @@
     "use_ping": true,
     "use_web_ui": true,
     "plugins": "",
-    "packages": ""
+    "packages": "",
+    "nb_command": ""
   },
   "computed": {
     "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}",
