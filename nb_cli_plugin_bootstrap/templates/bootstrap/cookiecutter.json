@@ -1,7 +1,7 @@
 {
   "nonebot": {
     "project_name": "",
-    "drivers": "",
+    "folder_name": "",
     "adapters": "",
     "env_superusers": "",
     "env_nickname": "",
@@ -20,7 +20,6 @@
   },
   "computed": {
     "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}",
-    "folder_name": "{{ cookiecutter.nonebot.project_name.replace(' ', '-').lower() }}",
     "ping_plugin_name": "{% if not cookiecutter.nonebot.use_ping %}_{% endif %}ping"
   },
   "_extensions": ["nb_cli.extensions.UnJsonifyExtension"]

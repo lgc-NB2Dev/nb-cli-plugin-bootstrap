@@ -161,6 +161,7 @@ async def update_project_handler(
                 click.secho(
                     f"\n更新 {pkg} 失败！原因：{info.reason}\n{info.stderr.rstrip()}",
                     fg="red",
+                    err=True,
                 )
 
     click.secho("更新完毕！\n", fg="green", bold=True)
