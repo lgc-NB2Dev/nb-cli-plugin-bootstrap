@@ -265,7 +265,7 @@ async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
             False
             if yes
             else await ConfirmPrompt(
-                "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？（该插件缺少教程，仅推荐进阶用户使用）",
+                "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？（该插件仍在开发中，不推荐用于生产环境）",
                 default_choice=False,
             ).prompt_async(style=CLI_DEFAULT_STYLE)
         )
