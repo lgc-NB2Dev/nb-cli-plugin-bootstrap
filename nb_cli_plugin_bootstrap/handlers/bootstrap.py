@@ -81,6 +81,7 @@ async def call_pip_no_output(
     return await call_pip(
         pip_args,
         python_path=python_path,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

@@ -5,9 +5,13 @@ from typing_extensions import TypeAlias
 
 import click
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
-from nb_cli.handlers.meta import get_default_python, get_nonebot_config, requires_pip
+from nb_cli.handlers.meta import (
+    get_default_python,
+    get_nonebot_config,
+    requires_pip,
+    requires_project_root,
+)
 from nb_cli.handlers.pip import call_pip_update
-from nb_cli.handlers.project import requires_project_root
 from noneprompt import ConfirmPrompt
 
 ADAPTER_PKG_PFX = "nonebot.adapters."
@@ -42,6 +46,10 @@ class FailInstallInfo:
             index = nf_index + len(nf_out)
             pkg = self.stderr[index:].strip()
             return f"包 {pkg} 不存在"
+        if "timed out" in self.stderr:
+            return "请求超时"
+        if "CERTIFICATE_VERIFY_FAILED" in self.stderr:
+            return "SSL 证书验证失败，通常是网络或代理问题"
         return "未知原因"
 
 
@@ -62,6 +70,7 @@ async def update_pkg(python_path: str, pkg: str) -> InstallInfoType:
     proc = await call_pip_update(
         pkg,
         python_path=python_path,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -120,6 +129,31 @@ def summary_infos(infos: List[InstallInfoType]) -> str:
     return "\n\n".join(info_li)
 
 
+async def update(packages: List[str], python_path: str) -> List[InstallInfoType]:
+    infos = []
+    with click.progressbar(
+        packages,
+        show_eta=False,
+        show_percent=True,
+        show_pos=True,
+        item_show_func=lambda x: (click.style(x, fg="green", bold=True) if x else None),
+        bar_template=f"更新中 {click.style('%(info)s', fg='cyan')} [%(bar)s]",
+    ) as pkgs_prog:
+        for pkg in pkgs_prog:
+            info = await update_pkg(python_path, pkg)
+            infos.append(info)
+            if isinstance(info, FailInstallInfo):
+                click.secho(
+                    f"\n更新 {pkg} 失败！可能原因：{info.reason}\n{info.stderr.rstrip()}",
+                    fg="red",
+                    err=True,
+                )
+
+    click.secho("更新完毕！\n", fg="green", bold=True)
+    click.echo(summary_infos(infos))
+    return infos
+
+
 @requires_project_root
 @requires_pip
 async def update_project_handler(
@@ -145,24 +179,14 @@ async def update_project_handler(
     ).prompt_async(style=CLI_DEFAULT_STYLE):
         return
 
-    infos = []
-    with click.progressbar(
-        pkgs,
-        show_eta=False,
-        show_percent=True,
-        show_pos=True,
-        item_show_func=lambda x: (click.style(x, fg="green", bold=True) if x else None),
-        bar_template=f"更新中 {click.style('%(info)s', fg='cyan')} [%(bar)s]",
-    ) as pkgs_prog:
-        for pkg in pkgs_prog:
-            info = await update_pkg(python_path, pkg)
-            infos.append(info)
-            if isinstance(info, FailInstallInfo):
-                click.secho(
-                    f"\n更新 {pkg} 失败！原因：{info.reason}\n{info.stderr.rstrip()}",
-                    fg="red",
-                    err=True,
-                )
-
-    click.secho("更新完毕！\n", fg="green", bold=True)
-    click.echo(summary_infos(infos))
+    while True:
+        infos = await update(pkgs, python_path)
+        failed_infos = [x for x in infos if isinstance(x, FailInstallInfo)]
+        if (not failed_infos) or (
+            not await ConfirmPrompt(
+                "部分包安装失败，是否重试？",
+                default_choice=True,
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        ):
+            break
+        pkgs = [x.name for x in failed_infos]
