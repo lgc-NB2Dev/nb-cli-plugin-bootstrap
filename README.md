@@ -50,6 +50,12 @@ nb self install nb-cli-plugin-bootstrap
 nb bootstrap
 ```
 
+或者
+
+```shell
+nb bs
+```
+
 <details>
 <summary>效果图（点击展开）</summary>
 
@@ -61,6 +67,12 @@ nb bootstrap
 
 ```shell
 nb update-project
+```
+
+或者
+
+```shell
+nb up
 ```
 
 <details>
@@ -92,10 +104,17 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
+### 0.1.5
+
+- 更新项目的总结会显示包更新前的版本号
+- 给指令添加了别名
+- 新增选项 `-y`，可以跳过大部分询问，直接使用默认值
+- 微调项目模板
+
 ### 0.1.4
 
 - 更新所有插件后如果有失败项会询问是否重试
-- 新增部分安装包失败时的错误原因
+- 新增部分 pip 安装错误原因分析
 - 重构部分逻辑
 - 微调项目模板 `.env.prod` 文件中的 `DRIVERS` 配置
 

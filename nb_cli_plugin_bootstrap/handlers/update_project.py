@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import click
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
@@ -33,20 +33,35 @@ def guess_adapter_pkg_name(module_names: List[str]) -> List[str]:
     return pkg_names
 
 
+def style_change(*change: Optional[str]) -> str:
+    return " -> ".join(
+        click.style(x, fg="cyan")
+        if x
+        else (click.style("已卸载", fg="red") if i else click.style("未安装", fg="yellow"))
+        for i, x in enumerate(change)
+    )
+
+
+def style_change_dict(change: Dict[str, Tuple[Optional[str], Optional[str]]]) -> str:
+    width = max(len(x) for x in change)
+    return "\n".join(
+        f"  {k.ljust(width)} {style_change(*v)}" for k, v in change.items()
+    )
+
+
 async def summary_infos(
     infos: List[InstallInfoType],
     pkgs_before_install: Dict[str, str],
     pkgs_after_install: Dict[str, str],
 ) -> str:
-    changed_pkgs: Dict[str, Optional[str]] = {}
-    for pkg, ver in (
-        (k, v)
-        for k, v in pkgs_after_install.items()
-        if k not in pkgs_before_install or pkgs_before_install[k] != v
-    ):
-        changed_pkgs[pkg] = ver
-    for pkg in (x for x in pkgs_before_install if x not in pkgs_after_install):
-        changed_pkgs[pkg] = None
+    changed_pkgs: Dict[str, Tuple[Optional[str], Optional[str]]] = {
+        k: (before, after)
+        for k in sorted(set(pkgs_before_install) | set(pkgs_after_install))
+        if (
+            (before := pkgs_before_install.get(k))
+            != (after := pkgs_after_install.get(k))
+        )
+    }
 
     success_infos = [x for x in infos if isinstance(x, SuccessInstallInfo)]
     unchanged_infos = [x for x in success_infos if x.name not in changed_pkgs]
@@ -65,10 +80,7 @@ async def summary_infos(
             fg="green",
             bold=True,
         )
-        updated_plugins = "\n".join(
-            f"  {k} {click.style(v or '已卸载', fg='cyan' if v else 'red')}"
-            for k, v in changed_plugins.items()
-        )
+        updated_plugins = style_change_dict(changed_plugins)
         info_li.append(f"{updated_title}\n{updated_plugins}")
 
     if changed_others:
@@ -77,10 +89,7 @@ async def summary_infos(
             fg="bright_blue",
             bold=True,
         )
-        other_pkgs = "\n".join(
-            f"  {k} {click.style(v or '已卸载', fg='cyan' if v else 'red')}"
-            for k, v in changed_others.items()
-        )
+        other_pkgs = style_change_dict(changed_others)
         info_li.append(f"{other_title}\n{other_pkgs}")
 
     if unchanged_infos:
@@ -99,7 +108,7 @@ async def summary_infos(
             bold=True,
         )
         fail_plugins = "\n".join(
-            f"  {x.name}：{click.style(x.reason, fg='red')}" for x in fail_infos
+            f"  {x.name}: {click.style(x.reason, fg='red')}" for x in fail_infos
         )
         info_li.append(f"{fail_title}\n{fail_plugins}")
 
@@ -109,7 +118,6 @@ async def summary_infos(
 # 不能一下子全传进去，否则可能导致依赖冲突
 async def update(packages: List[str], python_path: str) -> List[InstallInfoType]:
     pkg_list_before = await list_all_packages(python_path)
-
     infos = []
     with click.progressbar(
         packages,
@@ -128,8 +136,8 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
                     fg="red",
                     err=True,
                 )
-    click.secho("统计数据中\n", fg="yellow", bold=True)
 
+    click.secho("统计数据中\n", fg="yellow")
     pkg_list_after = await list_all_packages(python_path)
     click.echo(await summary_infos(infos, pkg_list_before, pkg_list_after))
     return infos
@@ -139,6 +147,7 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
 @requires_pip
 async def update_project_handler(
     *,
+    yes: bool = False,
     python_path: Optional[str] = None,
     cwd: Optional[Path] = None,  # noqa: ARG001
 ):
@@ -154,20 +163,26 @@ async def update_project_handler(
         click.secho("你还没有安装过商店插件或适配器，没有需要更新的包", fg="green")
         return
 
-    if not await ConfirmPrompt(
-        "一键更新所有适配器或插件有可能会导致它们之间不兼容导致报错，请问您是否真的要继续？",
-        default_choice=True,
-    ).prompt_async(style=CLI_DEFAULT_STYLE):
+    if not (
+        yes
+        or await ConfirmPrompt(
+            "一键更新所有适配器和插件有可能会导致它们之间不兼容导致报错，请问您是否真的要继续？",
+            default_choice=True,
+        ).prompt_async(style=CLI_DEFAULT_STYLE)
+    ):
         return
 
     while True:
         infos = await update(pkgs, python_path)
         failed_infos = [x for x in infos if isinstance(x, FailInstallInfo)]
         if (not failed_infos) or (
-            not await ConfirmPrompt(
-                "部分包安装失败，是否重试？",
-                default_choice=True,
-            ).prompt_async(style=CLI_DEFAULT_STYLE)
+            not (
+                yes
+                or await ConfirmPrompt(
+                    "部分包安装失败，是否重试？",
+                    default_choice=True,
+                ).prompt_async(style=CLI_DEFAULT_STYLE)
+            )
         ):
             break
         pkgs = [x.name for x in failed_infos]

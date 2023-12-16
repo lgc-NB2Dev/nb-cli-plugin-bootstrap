@@ -1,8 +1,8 @@
 {
   "nonebot": {
-    "project_name": "",
-    "folder_name": "",
-    "adapters": "",
+    "project_name": "bootstrap",
+    "folder_name": "bootstrap",
+    "adapters": "[]",
     "env_superusers": "",
     "env_nickname": "",
     "env_command_start": "",
@@ -13,9 +13,10 @@
     "is_windows": true,
     "redirect_localstore": true,
     "use_ping": true,
+    "use_logpile": true,
     "use_web_ui": true,
-    "plugins": "",
-    "packages": "",
+    "plugins": "[]",
+    "packages": "[]",
     "nb_command": ""
   },
   "computed": {

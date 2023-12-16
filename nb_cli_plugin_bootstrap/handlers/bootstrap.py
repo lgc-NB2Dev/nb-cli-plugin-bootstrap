@@ -92,7 +92,7 @@ async def prompt_input_list(prompt: str, **kwargs) -> List[str]:
     return result
 
 
-async def prompt_bootstrap_context(context: ProjectContext):
+async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
     context.packages.append("nonebot2[all]")
     context.variables["plugins"] = []
 
@@ -123,7 +123,8 @@ async def prompt_bootstrap_context(context: ProjectContext):
             True
             if adapters
             else (
-                await ConfirmPrompt(
+                yes
+                or await ConfirmPrompt(
                     "你还没有选择任何适配器！适配器是 NoneBot2 对接聊天平台的关键组件！真的要继续吗？",
                     default_choice=False,
                 ).prompt_async(style=CLI_DEFAULT_STYLE)
@@ -136,73 +137,93 @@ async def prompt_bootstrap_context(context: ProjectContext):
     ):
         context.packages.append(pkg)
 
-    env_superusers = await prompt_input_list(
-        "请输入 Bot 超级用户，超级用户拥有对 Bot 的最高权限（如对接 QQ 填 QQ 号即可）",
+    env_superusers = (
+        []
+        if yes
+        else await prompt_input_list(
+            "请输入 Bot 超级用户，超级用户拥有对 Bot 的最高权限（如对接 QQ 填 QQ 号即可）",
+        )
     )
     context.variables["env_superusers"] = json.dumps(env_superusers)
 
-    env_nickname = await prompt_input_list(
-        "请输入 Bot 昵称，消息以 Bot 昵称开头可以代替艾特",
+    env_nickname = (
+        []
+        if yes
+        else await prompt_input_list(
+            "请输入 Bot 昵称，消息以 Bot 昵称开头可以代替艾特",
+        )
     )
     context.variables["env_nickname"] = json.dumps(env_nickname)
 
     default_command_start = ["", "/", "#"]
-    env_command_start = await prompt_input_list(
-        "请输入 Bot 命令起始字符，消息以起始符开头将被识别为命令，\n"
-        '如果有一个指令为 查询，当该配置项中有 "/" 时使用 "/查询" 才能够触发，\n'
-        f"留空将使用默认值 {default_command_start}",
+    env_command_start = (
+        None
+        if yes
+        else await prompt_input_list(
+            "请输入 Bot 命令起始字符，消息以起始符开头将被识别为命令，\n"
+            '如果有一个指令为 查询，当该配置项中有 "/" 时使用 "/查询" 才能够触发，\n'
+            f"留空将使用默认值 {default_command_start}",
+        )
     )
     context.variables["env_command_start"] = json.dumps(
         env_command_start or default_command_start,
     )
 
     default_command_sep = [".", " "]
-    env_command_sep = await prompt_input_list(
-        f"请输入 Bot 命令分隔符，一般用于二级指令，\n留空将使用默认值 {default_command_sep}",
+    env_command_sep = (
+        None
+        if yes
+        else await prompt_input_list(
+            f"请输入 Bot 命令分隔符，一般用于二级指令，\n留空将使用默认值 {default_command_sep}",
+        )
     )
     context.variables["env_command_sep"] = json.dumps(
         env_command_sep or default_command_sep,
     )
 
-    click.secho("请输入 NoneBot2 监听地址，如果要对公网开放，改为 0.0.0.0 即可", bold=True)
-    env_host = (
-        await InputPrompt(
-            INPUT_QUESTION,
-            default_text="127.0.0.1",
-            validator=validate_ip_v_any_addr,
-            error_message="地址格式不正确！",
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
-    ).strip()
+    env_host = "127.0.0.1"
+    if not yes:
+        click.secho("请输入 NoneBot2 监听地址，如果要对公网开放，改为 0.0.0.0 即可", bold=True)
+        env_host = (
+            await InputPrompt(
+                INPUT_QUESTION,
+                default_text=env_host,
+                validator=validate_ip_v_any_addr,
+                error_message="地址格式不正确！",
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        ).strip()
     context.variables["env_host"] = env_host
 
-    click.secho(
-        "请输入 NoneBot2 监听端口，范围 1 ~ 65535，请保证该端口号与连接端配置相同，或与端口映射配置相关",
-        bold=True,
-    )
-    env_port = (
-        await InputPrompt(
-            INPUT_QUESTION,
-            default_text="8080",
-            validator=lambda x: x.isdigit() and 1 <= int(x) <= 65535,
-            error_message="端口号必须为范围 1 ~ 65535 的整数！",
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
-    ).strip()
+    env_port = "8080"
+    if not yes:
+        click.secho(
+            "请输入 NoneBot2 监听端口，范围 1 ~ 65535，请保证该端口号与连接端配置相同，或与端口映射配置相关",
+            bold=True,
+        )
+        env_port = (
+            await InputPrompt(
+                INPUT_QUESTION,
+                default_text=env_port,
+                validator=lambda x: x.isdigit() and 1 <= int(x) <= 65535,
+                error_message="端口号必须为范围 1 ~ 65535 的整数！",
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        ).strip()
     context.variables["env_port"] = env_port
 
-    use_run_script = await ConfirmPrompt(
+    use_run_script = yes or await ConfirmPrompt(
         "是否在项目目录中释出快捷启动脚本？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["use_run_script"] = use_run_script
     context.variables["is_windows"] = IS_WINDOWS
 
-    redirect_localstore = await ConfirmPrompt(
+    redirect_localstore = yes or await ConfirmPrompt(
         "是否将 localstore 插件的存储路径重定向到项目路径下以便于后续迁移 Bot？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["redirect_localstore"] = redirect_localstore
 
-    use_ping = await ConfirmPrompt(
+    use_ping = yes or await ConfirmPrompt(
         "是否使用超级用户 Ping 指令回复插件？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
@@ -210,15 +231,19 @@ async def prompt_bootstrap_context(context: ProjectContext):
 
     has_onebot = "nonebot-adapter-onebot" in context.packages
     if has_onebot:
-        install_gocqhttp = await ConfirmPrompt(
-            "是否安装 gocqhttp 插件提供内置 GoCQHTTP 启动器？（不推荐）",
-            default_choice=False,
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
+        install_gocqhttp = (
+            False
+            if yes
+            else await ConfirmPrompt(
+                "是否安装 gocqhttp 插件提供内置 GoCQHTTP 启动器？（不推荐）",
+                default_choice=False,
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        )
         if install_gocqhttp:
             context.packages.append("nonebot-plugin-gocqhttp")
             context.variables["plugins"].append("nonebot_plugin_gocqhttp")
 
-        install_guild_patch = await ConfirmPrompt(
+        install_guild_patch = yes or await ConfirmPrompt(
             "是否安装 guild-patch 插件提供对 GoCQHTTP 的 QQ 频道支持？",
             default_choice=True,
         ).prompt_async(style=CLI_DEFAULT_STYLE)
@@ -226,19 +251,24 @@ async def prompt_bootstrap_context(context: ProjectContext):
             context.packages.append("nonebot-plugin-guild-patch")
             context.variables["plugins"].append("nonebot_plugin_guild_patch")
 
-    install_logpile = await ConfirmPrompt(
+    install_logpile = yes or await ConfirmPrompt(
         "是否安装 logpile 插件提供日志记录到文件功能？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
+    context.variables["use_logpile"] = install_logpile
     if install_logpile:
         context.packages.append("nonebot-plugin-logpile")
         context.variables["plugins"].append("nonebot_plugin_logpile")
 
     if use_run_script:
-        use_web_ui = await ConfirmPrompt(
-            "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？（该插件缺少教程，仅推荐进阶用户使用）",
-            default_choice=False,
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
+        use_web_ui = (
+            False
+            if yes
+            else await ConfirmPrompt(
+                "是否在启动脚本中使用 webui 插件启动项目以使用网页管理 NoneBot？（该插件缺少教程，仅推荐进阶用户使用）",
+                default_choice=False,
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        )
         context.variables["use_web_ui"] = use_web_ui
     else:
         context.variables["use_web_ui"] = False
@@ -317,11 +347,11 @@ async def change_pip_mirror():
         click.secho(f"PyPI 源配置失败！\n{err}", fg="red", bold=True, err=True)
 
 
-async def post_project_render(context: ProjectContext) -> bool:
+async def post_project_render(context: ProjectContext, yes: bool = False) -> bool:
     if context.variables["use_web_ui"]:
         await configure_web_ui()
 
-    use_venv = await ConfirmPrompt(
+    use_venv = yes or await ConfirmPrompt(
         "是否新建虚拟环境？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
@@ -342,18 +372,25 @@ async def post_project_render(context: ProjectContext) -> bool:
             return False
         click.secho("创建虚拟环境成功", fg="green", bold=True)
 
-    if await ConfirmPrompt(
-        "是否需要修改或清除 pip 的 PyPI 镜像源配置？",
-        default_choice=False,
-    ).prompt_async(style=CLI_DEFAULT_STYLE):
+    if (
+        False
+        if yes
+        else await ConfirmPrompt(
+            "是否需要修改或清除 pip 的 PyPI 镜像源配置？",
+            default_choice=False,
+        ).prompt_async(style=CLI_DEFAULT_STYLE)
+    ):
         await change_pip_mirror()
 
     manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
     if (not use_venv) or (
-        not await ConfirmPrompt(
-            "是否立即安装项目依赖？",
-            default_choice=True,
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
+        not (
+            yes
+            or await ConfirmPrompt(
+                "是否立即安装项目依赖？",
+                default_choice=True,
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        )
     ):
         click.secho(manually_install_tip, fg="green")
         return True
@@ -375,32 +412,35 @@ async def post_project_render(context: ProjectContext) -> bool:
         )
         return False
 
-    builtin_plugins = await list_builtin_plugins(python_path=config_manager.python_path)
-    selected_builtin_plugins = [
-        x.data
-        for x in await CheckboxPrompt(
-            "请选择需要启用的内置插件",
-            [Choice(p, p) for p in builtin_plugins],
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
-    ]
-    try:
-        for plugin in selected_builtin_plugins:
-            config_manager.add_builtin_plugin(plugin)
-    except Exception:
-        click.secho(
-            f"启用内置插件失败\n{traceback.format_exc()}",
-            fg="red",
-            bold=True,
-            err=True,
+    if not yes:
+        builtin_plugins = await list_builtin_plugins(
+            python_path=config_manager.python_path,
         )
-        return False
+        selected_builtin_plugins = [
+            x.data
+            for x in await CheckboxPrompt(
+                "请选择需要启用的内置插件",
+                [Choice(p, p) for p in builtin_plugins],
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        ]
+        try:
+            for plugin in selected_builtin_plugins:
+                config_manager.add_builtin_plugin(plugin)
+        except Exception:
+            click.secho(
+                f"启用内置插件失败\n{traceback.format_exc()}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            return False
 
     return True
 
 
-async def bootstrap_handler():
+async def bootstrap_handler(*, yes: bool = False):
     context = ProjectContext()
-    await prompt_bootstrap_context(context)
+    await prompt_bootstrap_context(context, yes=yes)
 
     nb_command_list = [sys.executable, "-m", "nb_cli"]
     context.variables["nb_command"] = (
@@ -426,7 +466,7 @@ async def bootstrap_handler():
         return
     click.secho(f"成功新建项目 {context.variables['project_name']}", fg="green", bold=True)
 
-    if await post_project_render(context):
+    if await post_project_render(context, yes=yes):
         click.secho("项目配置完毕，开始使用吧！", fg="green", bold=True)
     else:
         click.secho("项目配置失败！你可能需要考虑手动进行后续配置，或重新创建一次项目", fg="red", bold=True, err=True)
