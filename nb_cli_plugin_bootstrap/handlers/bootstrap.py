@@ -1,13 +1,11 @@
-import asyncio
 import json
 import platform
 import shlex
 import subprocess
 import sys
 import traceback
-from asyncio.subprocess import Process
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import click
 from cookiecutter.main import cookiecutter
@@ -18,7 +16,6 @@ from nb_cli.cli.commands.project import (
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
 from nb_cli.config.parser import ConfigManager
 from nb_cli.handlers.adapter import list_adapters
-from nb_cli.handlers.pip import call_pip
 from nb_cli.handlers.plugin import list_builtin_plugins
 from nb_cli.handlers.process import create_process
 from nb_cli.handlers.venv import create_virtualenv
@@ -28,6 +25,8 @@ from pydantic.config import BaseConfig
 from pydantic.errors import IPvAnyAddressError
 from pydantic.fields import ModelField
 from pydantic.networks import AnyHttpUrl, IPvAnyAddress
+
+from ..utils import call_pip_no_output, call_pip_update_no_output
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BOOTSTRAP_TEMPLATE_DIR = TEMPLATES_DIR / "bootstrap"
@@ -72,29 +71,6 @@ def validate_http_url(url: str) -> bool:
 
 def format_project_folder_name(project_name: str) -> str:
     return project_name.replace(" ", "-").lower()
-
-
-async def call_pip_no_output(
-    pip_args: List[str],
-    python_path: Optional[str] = None,
-) -> Process:
-    return await call_pip(
-        pip_args,
-        python_path=python_path,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
-
-async def call_pip_update_no_output(
-    pip_args: List[str],
-    python_path: Optional[str] = None,
-) -> Process:
-    return await call_pip_no_output(
-        ["install", "--upgrade", *pip_args],
-        python_path=python_path,
-    )
 
 
 async def prompt_input_list(prompt: str, **kwargs) -> List[str]:

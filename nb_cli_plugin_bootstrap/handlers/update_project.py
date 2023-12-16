@@ -1,7 +1,5 @@
-import asyncio
 from pathlib import Path
-from typing import List, Optional, Union
-from typing_extensions import TypeAlias
+from typing import Dict, List, Optional
 
 import click
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
@@ -11,49 +9,18 @@ from nb_cli.handlers.meta import (
     requires_pip,
     requires_project_root,
 )
-from nb_cli.handlers.pip import call_pip_update
 from noneprompt import ConfirmPrompt
+
+from ..utils import (
+    FailInstallInfo,
+    InstallInfoType,
+    SuccessInstallInfo,
+    list_all_packages,
+    update_package,
+)
 
 ADAPTER_PKG_PFX = "nonebot.adapters."
 LEN_ADAPTER_PKG_PFX = len(ADAPTER_PKG_PFX)
-
-
-class SuccessInstallInfo:
-    def __init__(self, name: str, stdout: str):
-        self.name = name
-        self.stdout = stdout
-
-        self.version = self._parse_version()
-
-    def _parse_version(self) -> Optional[str]:
-        suc_out = "Successfully installed "
-        if suc_out in self.stdout:
-            index = self.stdout.rfind(self.name) + len(self.name) + 1
-            return self.stdout[index : self.stdout.find(" ", index)].strip()
-        return None
-
-
-class FailInstallInfo:
-    def __init__(self, name: str, stderr: str):
-        self.name = name
-        self.stderr = stderr
-
-        self.reason = self._parse_reason()
-
-    def _parse_reason(self) -> Optional[str]:
-        nf_out = "No matching distribution found for "
-        if (nf_index := self.stderr.find(nf_out)) != -1:
-            index = nf_index + len(nf_out)
-            pkg = self.stderr[index:].strip()
-            return f"包 {pkg} 不存在"
-        if "timed out" in self.stderr:
-            return "请求超时"
-        if "CERTIFICATE_VERIFY_FAILED" in self.stderr:
-            return "SSL 证书验证失败，通常是网络或代理问题"
-        return "未知原因"
-
-
-InstallInfoType: TypeAlias = Union[SuccessInstallInfo, FailInstallInfo]
 
 
 def guess_adapter_pkg_name(module_names: List[str]) -> List[str]:
@@ -66,45 +33,55 @@ def guess_adapter_pkg_name(module_names: List[str]) -> List[str]:
     return pkg_names
 
 
-async def update_pkg(python_path: str, pkg: str) -> InstallInfoType:
-    proc = await call_pip_update(
-        pkg,
-        python_path=python_path,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    return_code = await proc.wait()
+async def summary_infos(
+    infos: List[InstallInfoType],
+    pkgs_before_install: Dict[str, str],
+    pkgs_after_install: Dict[str, str],
+) -> str:
+    changed_pkgs: Dict[str, Optional[str]] = {}
+    for pkg, ver in (
+        (k, v)
+        for k, v in pkgs_after_install.items()
+        if k not in pkgs_before_install or pkgs_before_install[k] != v
+    ):
+        changed_pkgs[pkg] = ver
+    for pkg in (x for x in pkgs_before_install if x not in pkgs_after_install):
+        changed_pkgs[pkg] = None
 
-    if return_code == 0:
-        return SuccessInstallInfo(
-            pkg,
-            (await proc.stdout.read()).decode() if proc.stdout else "",
-        )
-    return FailInstallInfo(
-        pkg,
-        (await proc.stderr.read()).decode() if proc.stderr else "",
-    )
-
-
-def summary_infos(infos: List[InstallInfoType]) -> str:
     success_infos = [x for x in infos if isinstance(x, SuccessInstallInfo)]
-    updated_infos = [x for x in success_infos if x.version]
-    unchanged_infos = [x for x in success_infos if x not in updated_infos]
+    unchanged_infos = [x for x in success_infos if x.name not in changed_pkgs]
     fail_infos = [x for x in infos if isinstance(x, FailInstallInfo)]
+    changed_plugins = {
+        k: v
+        for k, v in changed_pkgs.items()
+        if any(True for x in success_infos if x.name == k)
+    }
+    changed_others = {k: v for k, v in changed_pkgs.items() if k not in changed_plugins}
 
     info_li: List[str] = []
-
-    if updated_infos:
+    if changed_plugins:
         updated_title = click.style(
-            f"已更新（{len(updated_infos)} 个）：",
+            f"已更新（{len(changed_plugins)} 个）：",
             fg="green",
             bold=True,
         )
         updated_plugins = "\n".join(
-            f"  {x.name} {click.style(x.version, fg='cyan')}" for x in updated_infos
+            f"  {k} {click.style(v or '已卸载', fg='cyan' if v else 'red')}"
+            for k, v in changed_plugins.items()
         )
         info_li.append(f"{updated_title}\n{updated_plugins}")
+
+    if changed_others:
+        other_title = click.style(
+            f"版本变动的其他包（{len(changed_others)} 个）：",
+            fg="bright_blue",
+            bold=True,
+        )
+        other_pkgs = "\n".join(
+            f"  {k} {click.style(v or '已卸载', fg='cyan' if v else 'red')}"
+            for k, v in changed_others.items()
+        )
+        info_li.append(f"{other_title}\n{other_pkgs}")
 
     if unchanged_infos:
         unchanged_title = click.style(
@@ -129,7 +106,10 @@ def summary_infos(infos: List[InstallInfoType]) -> str:
     return "\n\n".join(info_li)
 
 
+# 不能一下子全传进去，否则可能导致依赖冲突
 async def update(packages: List[str], python_path: str) -> List[InstallInfoType]:
+    pkg_list_before = await list_all_packages(python_path)
+
     infos = []
     with click.progressbar(
         packages,
@@ -140,7 +120,7 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
         bar_template=f"更新中 {click.style('%(info)s', fg='cyan')} [%(bar)s]",
     ) as pkgs_prog:
         for pkg in pkgs_prog:
-            info = await update_pkg(python_path, pkg)
+            info = await update_package(pkg, python_path)
             infos.append(info)
             if isinstance(info, FailInstallInfo):
                 click.secho(
@@ -148,9 +128,10 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
                     fg="red",
                     err=True,
                 )
+    click.secho("统计数据中\n", fg="yellow", bold=True)
 
-    click.secho("更新完毕！\n", fg="green", bold=True)
-    click.echo(summary_infos(infos))
+    pkg_list_after = await list_all_packages(python_path)
+    click.echo(await summary_infos(infos, pkg_list_before, pkg_list_after))
     return infos
 
 
