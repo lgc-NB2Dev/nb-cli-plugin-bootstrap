@@ -74,14 +74,14 @@ async def summary_infos(
     changed_others = {k: v for k, v in changed_pkgs.items() if k not in changed_plugins}
 
     info_li: List[str] = []
-    if changed_plugins:
-        updated_title = click.style(
-            f"已更新（{len(changed_plugins)} 个）：",
-            fg="green",
+    if unchanged_infos:
+        unchanged_title = click.style(
+            f"版本未变（{len(unchanged_infos)} 个）：",
+            fg="yellow",
             bold=True,
         )
-        updated_plugins = style_change_dict(changed_plugins)
-        info_li.append(f"{updated_title}\n{updated_plugins}")
+        unchanged_plugins = "\n".join(f"  {x.name}" for x in unchanged_infos)
+        info_li.append(f"{unchanged_title}\n{unchanged_plugins}")
 
     if changed_others:
         other_title = click.style(
@@ -92,14 +92,14 @@ async def summary_infos(
         other_pkgs = style_change_dict(changed_others)
         info_li.append(f"{other_title}\n{other_pkgs}")
 
-    if unchanged_infos:
-        unchanged_title = click.style(
-            f"版本未变（{len(unchanged_infos)} 个）：",
-            fg="yellow",
+    if changed_plugins:
+        updated_title = click.style(
+            f"已更新（{len(changed_plugins)} 个）：",
+            fg="green",
             bold=True,
         )
-        unchanged_plugins = "\n".join(f"  {x.name}" for x in unchanged_infos)
-        info_li.append(f"{unchanged_title}\n{unchanged_plugins}")
+        updated_plugins = style_change_dict(changed_plugins)
+        info_li.append(f"{updated_title}\n{updated_plugins}")
 
     if fail_infos:
         fail_title = click.style(
