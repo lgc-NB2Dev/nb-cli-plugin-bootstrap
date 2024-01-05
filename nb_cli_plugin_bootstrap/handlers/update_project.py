@@ -66,12 +66,16 @@ async def summary_infos(
     success_infos = [x for x in infos if isinstance(x, SuccessInstallInfo)]
     unchanged_infos = [x for x in success_infos if x.name not in changed_pkgs]
     fail_infos = [x for x in infos if isinstance(x, FailInstallInfo)]
-    changed_plugins = {
+    changed_targets = {
         k: v
         for k, v in changed_pkgs.items()
         if any(True for x in success_infos if x.name == k)
     }
-    changed_others = {k: v for k, v in changed_pkgs.items() if k not in changed_plugins}
+    changed_others = {
+        k: v
+        for k, v in changed_pkgs.items()
+        if k.replace("_", "-") not in changed_targets
+    }
 
     info_li: List[str] = []
     if unchanged_infos:
@@ -92,13 +96,13 @@ async def summary_infos(
         other_pkgs = style_change_dict(changed_others)
         info_li.append(f"{other_title}\n{other_pkgs}")
 
-    if changed_plugins:
+    if changed_targets:
         updated_title = click.style(
-            f"已更新（{len(changed_plugins)} 个）：",
+            f"已更新（{len(changed_targets)} 个）：",
             fg="green",
             bold=True,
         )
-        updated_plugins = style_change_dict(changed_plugins)
+        updated_plugins = style_change_dict(changed_targets)
         info_li.append(f"{updated_title}\n{updated_plugins}")
 
     if fail_infos:
