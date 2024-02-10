@@ -183,7 +183,10 @@ async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
 
     env_host = "127.0.0.1"
     if not yes:
-        click.secho("请输入 NoneBot2 监听地址，如果要对公网开放，改为 0.0.0.0 即可", bold=True)
+        click.secho(
+            "请输入 NoneBot2 监听地址，如果要对公网开放，改为 0.0.0.0 即可",
+            bold=True,
+        )
         env_host = (
             await InputPrompt(
                 INPUT_QUESTION,
@@ -462,11 +465,25 @@ async def bootstrap_handler(*, yes: bool = False):
             output_dir=".",
         )
     except Exception:
-        click.secho(f"新建项目失败！\n{traceback.format_exc()}", fg="red", bold=True, err=True)
+        click.secho(
+            f"新建项目失败！\n{traceback.format_exc()}",
+            fg="red",
+            bold=True,
+            err=True,
+        )
         return
-    click.secho(f"成功新建项目 {context.variables['project_name']}", fg="green", bold=True)
+    click.secho(
+        f"成功新建项目 {context.variables['project_name']}",
+        fg="green",
+        bold=True,
+    )
 
     if await post_project_render(context, yes=yes):
         click.secho("项目配置完毕，开始使用吧！", fg="green", bold=True)
     else:
-        click.secho("项目配置失败！你可能需要考虑手动进行后续配置，或重新创建一次项目", fg="red", bold=True, err=True)
+        click.secho(
+            "项目配置失败！你可能需要考虑手动进行后续配置，或重新创建一次项目",
+            fg="red",
+            bold=True,
+            err=True,
+        )

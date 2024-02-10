@@ -37,7 +37,9 @@ def style_change(*change: Optional[str]) -> str:
     return " -> ".join(
         click.style(x, fg="cyan")
         if x
-        else (click.style("已卸载", fg="red") if i else click.style("未安装", fg="yellow"))
+        else (
+            click.style("已卸载", fg="red") if i else click.style("未安装", fg="yellow")
+        )
         for i, x in enumerate(change)
     )
 
