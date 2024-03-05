@@ -16,6 +16,7 @@ from ..utils import (
     InstallInfoType,
     SuccessInstallInfo,
     list_all_packages,
+    normalize_pkg_name,
     update_package,
 )
 
@@ -30,7 +31,7 @@ def guess_adapter_pkg_name(module_names: List[str]) -> List[str]:
             name = name[LEN_ADAPTER_PKG_PFX:]
         name = name.split(".", maxsplit=1)[0]
         pkg_names.append(f"nonebot-adapter-{name}")
-    return pkg_names
+    return [normalize_pkg_name(x) for x in pkg_names]
 
 
 def style_change(*change: Optional[str]) -> str:
@@ -73,11 +74,7 @@ async def summary_infos(
         for k, v in changed_pkgs.items()
         if any(True for x in success_infos if x.name == k)
     }
-    changed_others = {
-        k: v
-        for k, v in changed_pkgs.items()
-        if k.replace("_", "-") not in changed_targets
-    }
+    changed_others = {k: v for k, v in changed_pkgs.items() if k not in changed_targets}
 
     info_li: List[str] = []
     if unchanged_infos:
@@ -163,7 +160,7 @@ async def update_project_handler(
 
     pkgs = [
         *guess_adapter_pkg_name([x.module_name for x in bot_config.adapters]),
-        *(x.replace("_", "-") for x in bot_config.plugins),
+        *(normalize_pkg_name(x) for x in bot_config.plugins),
     ]
     if not pkgs:
         click.secho("你还没有安装过商店插件或适配器，没有需要更新的包", fg="green")

@@ -1,8 +1,12 @@
+from typing import cast
+
 import click
-from nb_cli.cli import ClickAliasedGroup, cli, run_async
+from nb_cli.cli import ClickAliasedGroup, cli as cli_, run_async
 
 from .handlers.bootstrap import bootstrap_handler
 from .handlers.update_project import update_project_handler
+
+cli = cast(ClickAliasedGroup, cli_)
 
 
 @click.group(

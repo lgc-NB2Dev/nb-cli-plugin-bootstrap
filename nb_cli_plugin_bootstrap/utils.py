@@ -93,6 +93,10 @@ async def call_pip_update_no_output(
     )
 
 
+def normalize_pkg_name(name: str) -> str:
+    return name.replace("_", "-").lower()
+
+
 async def list_all_packages(python_path: Optional[str] = None) -> Dict[str, str]:
     proc = await call_pip_no_output(["list", "--format=json"], python_path=python_path)
     return_code = await proc.wait()
@@ -100,7 +104,7 @@ async def list_all_packages(python_path: Optional[str] = None) -> Dict[str, str]
         raise RuntimeError("Failed to execute command `pip list`")
     assert proc.stdout
     stdout = decode(await proc.stdout.read())
-    return {x["name"]: x["version"] for x in json.loads(stdout)}
+    return {normalize_pkg_name(x["name"]): x["version"] for x in json.loads(stdout)}
 
 
 async def update_package(

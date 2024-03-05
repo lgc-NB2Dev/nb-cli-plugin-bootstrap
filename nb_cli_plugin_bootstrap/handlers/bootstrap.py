@@ -14,6 +14,7 @@ from nb_cli.cli.commands.project import (
     project_name_validator,
 )
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
+from nb_cli.compat import type_validate_python
 from nb_cli.config.parser import ConfigManager
 from nb_cli.handlers.adapter import list_adapters
 from nb_cli.handlers.plugin import list_builtin_plugins
@@ -21,10 +22,7 @@ from nb_cli.handlers.process import create_process
 from nb_cli.handlers.venv import create_virtualenv
 from noneprompt import CheckboxPrompt, Choice, ConfirmPrompt, InputPrompt
 from noneprompt.prompts.list import ListPrompt
-from pydantic.config import BaseConfig
-from pydantic.errors import IPvAnyAddressError
-from pydantic.fields import ModelField
-from pydantic.networks import AnyHttpUrl, IPvAnyAddress
+from pydantic import AnyHttpUrl, BaseModel, IPvAnyAddress, ValidationError
 
 from ..utils import call_pip_no_output, call_pip_update_no_output
 
@@ -45,26 +43,23 @@ PYPI_MIRRORS = (
 
 
 def validate_ip_v_any_addr(addr: str) -> bool:
+    class ValidateModel(BaseModel):
+        addr: IPvAnyAddress
+
     try:
-        IPvAnyAddress.validate(addr)
-    except IPvAnyAddressError:
+        type_validate_python(ValidateModel, {"addr": addr})
+    except ValidationError:
         return False
     return True
 
 
 def validate_http_url(url: str) -> bool:
+    class ValidateModel(BaseModel):
+        url: AnyHttpUrl
+
     try:
-        AnyHttpUrl.validate(
-            url,
-            ModelField(
-                name="",
-                type_=AnyHttpUrl,
-                class_validators=None,
-                model_config=BaseConfig,
-            ),
-            BaseConfig(),
-        )
-    except Exception:
+        type_validate_python(ValidateModel, {"url": url})
+    except ValidationError:
         return False
     return True
 
