@@ -1,11 +1,15 @@
 import asyncio
 import json
 import locale
+import sys
 from asyncio.subprocess import Process
-from typing import Dict, List, Optional, Union
+from io import StringIO
+from typing import Dict, List, Optional, TextIO, Tuple, Union
 from typing_extensions import TypeAlias
 
+from nb_cli.compat import type_validate_python
 from nb_cli.handlers.pip import call_pip
+from pydantic import AnyHttpUrl, BaseModel, IPvAnyAddress, ValidationError
 
 InstallInfoType: TypeAlias = Union["SuccessInstallInfo", "FailInstallInfo"]
 
@@ -70,7 +74,7 @@ def decode(s: bytes) -> str:
         return s.decode(ENC, errors="replace")
 
 
-async def call_pip_no_output(
+async def call_pip_simp(
     pip_args: List[str],
     python_path: Optional[str] = None,
 ) -> Process:
@@ -83,14 +87,47 @@ async def call_pip_no_output(
     )
 
 
-async def call_pip_update_no_output(
+async def call_pip_update_simp(
     pip_args: List[str],
     python_path: Optional[str] = None,
 ) -> Process:
-    return await call_pip_no_output(
+    return await call_pip_simp(
         ["install", "--upgrade", *pip_args],
         python_path=python_path,
     )
+
+
+async def read_stream(
+    stream: Optional[asyncio.StreamReader],
+    outer: Optional[TextIO] = None,
+) -> str:
+    if not stream:
+        return ""
+
+    cached_io = StringIO()
+    async for data in stream:
+        data_str = decode(data)
+        cached_io.write(data_str)
+        if outer:
+            outer.write(data_str)
+
+    return cached_io.getvalue()
+
+
+async def wait(
+    proc: asyncio.subprocess.Process,
+    verbose: bool = False,
+) -> Tuple[int, str, str]:
+    if verbose:
+        stdout, stderr = await asyncio.gather(
+            read_stream(proc.stdout, sys.stdout),
+            read_stream(proc.stderr, sys.stderr),
+        )
+    else:
+        stdout_b, stderr_b = await proc.communicate()
+        stdout = decode(stdout_b)
+        stderr = decode(stderr_b)
+    return (await proc.wait(), stdout, stderr)
 
 
 def normalize_pkg_name(name: str) -> str:
@@ -98,7 +135,7 @@ def normalize_pkg_name(name: str) -> str:
 
 
 async def list_all_packages(python_path: Optional[str] = None) -> Dict[str, str]:
-    proc = await call_pip_no_output(["list", "--format=json"], python_path=python_path)
+    proc = await call_pip_simp(["list", "--format=json"], python_path=python_path)
     return_code = await proc.wait()
     if not return_code == 0:
         raise RuntimeError("Failed to execute command `pip list`")
@@ -110,13 +147,36 @@ async def list_all_packages(python_path: Optional[str] = None) -> Dict[str, str]
 async def update_package(
     pkg: str,
     python_path: Optional[str] = None,
+    verbose: bool = False,
 ) -> InstallInfoType:
-    proc = await call_pip_update_no_output([pkg], python_path=python_path)
-    return_code = await proc.wait()
-    stdout = decode(await proc.stdout.read()) if proc.stdout else ""
-    stderr = decode(await proc.stderr.read()) if proc.stderr else ""
+    if verbose:
+        print()
+    proc = await call_pip_update_simp([pkg], python_path=python_path)
+    return_code, stdout, stderr = await wait(proc, verbose=verbose)
     return (
         SuccessInstallInfo(pkg, stdout, stderr)
         if return_code == 0
         else FailInstallInfo(pkg, stdout, stderr)
     )
+
+
+def validate_ip_v_any_addr(addr: str) -> bool:
+    class ValidateModel(BaseModel):
+        addr: IPvAnyAddress
+
+    try:
+        type_validate_python(ValidateModel, {"addr": addr})
+    except ValidationError:
+        return False
+    return True
+
+
+def validate_http_url(url: str) -> bool:
+    class ValidateModel(BaseModel):
+        url: AnyHttpUrl
+
+    try:
+        type_validate_python(ValidateModel, {"url": url})
+    except ValidationError:
+        return False
+    return True

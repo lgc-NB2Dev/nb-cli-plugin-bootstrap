@@ -3,7 +3,7 @@ name = "nb-cli-plugin-bootstrap"
 dynamic = ["version"]
 description = "A nb-cli plugin for quickly create and bootstrap a NoneBot2 project."
 authors = [{ name = "student_2333", email = "lgc2333@126.com" }]
-dependencies = ["nb-cli>=1.4.0"]
+dependencies = ["nb-cli>=1.4.0", "poetry>=1.8.2"]
 requires-python = ">=3.9,<4.0"
 readme = "README.md"
 license = { text = "MIT" }

@@ -51,11 +51,6 @@ nb self install nb-cli-plugin-bootstrap
 
 ```shell
 nb bootstrap
-```
-
-或者
-
-```shell
 nb bs
 ```
 
@@ -70,11 +65,6 @@ nb bs
 
 ```shell
 nb update-project
-```
-
-或者
-
-```shell
 nb up
 ```
 
@@ -83,6 +73,34 @@ nb up
 
 ![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/update-project1.png)
 ![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/update-project2.png)
+
+</details>
+
+### 快速修改全局 pip 的 PyPI 镜像源配置
+
+```shell
+nb pip-index
+nb pi
+```
+
+<details>
+<summary>效果图（点击展开）</summary>
+
+![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/pip-index.png)
+
+</details>
+
+### 进入当前项目的虚拟环境
+
+```shell
+nb shell
+nb sh
+```
+
+<details>
+<summary>效果图（点击展开）</summary>
+
+![效果图](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/cli-bootstrap/shell.png)
 
 </details>
 
@@ -106,6 +124,12 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
   </details>
 
 ## 📝 更新日志
+
+### 0.3.0
+
+- 添加 `nb pip-index` 与 `nb shell` 命令
+- 为部分指令新增 `-v` 选项用于输出更多信息
+- 微调项目模板
 
 ### 0.2.0
 

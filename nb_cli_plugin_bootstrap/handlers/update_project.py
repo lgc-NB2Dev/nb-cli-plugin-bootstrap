@@ -119,7 +119,11 @@ async def summary_infos(
 
 
 # 不能一下子全传进去，否则可能导致依赖冲突
-async def update(packages: List[str], python_path: str) -> List[InstallInfoType]:
+async def update(
+    packages: List[str],
+    python_path: str,
+    verbose: bool = False,
+) -> List[InstallInfoType]:
     pkg_list_before = await list_all_packages(python_path)
     infos = []
     with click.progressbar(
@@ -131,7 +135,7 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
         bar_template=f"更新中 {click.style('%(info)s', fg='cyan')} [%(bar)s]",
     ) as pkgs_prog:
         for pkg in pkgs_prog:
-            info = await update_package(pkg, python_path)
+            info = await update_package(pkg, python_path, verbose=verbose)
             infos.append(info)
             if isinstance(info, FailInstallInfo):
                 click.secho(
@@ -151,6 +155,7 @@ async def update(packages: List[str], python_path: str) -> List[InstallInfoType]
 async def update_project_handler(
     *,
     yes: bool = False,
+    verbose: bool = False,
     python_path: Optional[str] = None,
     cwd: Optional[Path] = None,  # noqa: ARG001
 ):
@@ -176,7 +181,7 @@ async def update_project_handler(
         return
 
     while True:
-        infos = await update(pkgs, python_path)
+        infos = await update(pkgs, python_path, verbose=verbose)
         failed_infos = [x for x in infos if isinstance(x, FailInstallInfo)]
         if (not failed_infos) or (
             not (

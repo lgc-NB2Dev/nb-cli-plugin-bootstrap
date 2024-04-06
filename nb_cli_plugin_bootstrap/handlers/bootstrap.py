@@ -1,5 +1,4 @@
 import json
-import platform
 import shlex
 import subprocess
 import sys
@@ -14,54 +13,20 @@ from nb_cli.cli.commands.project import (
     project_name_validator,
 )
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
-from nb_cli.compat import type_validate_python
 from nb_cli.config.parser import ConfigManager
+from nb_cli.consts import WINDOWS
 from nb_cli.handlers.adapter import list_adapters
 from nb_cli.handlers.plugin import list_builtin_plugins
 from nb_cli.handlers.process import create_process
 from nb_cli.handlers.venv import create_virtualenv
 from noneprompt import CheckboxPrompt, Choice, ConfirmPrompt, InputPrompt
-from noneprompt.prompts.list import ListPrompt
-from pydantic import AnyHttpUrl, BaseModel, IPvAnyAddress, ValidationError
 
-from ..utils import call_pip_no_output, call_pip_update_no_output
+from ..const import INPUT_QUESTION
+from ..utils import call_pip_update_simp, validate_ip_v_any_addr, wait
+from .pip_index import pip_index_handler
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BOOTSTRAP_TEMPLATE_DIR = TEMPLATES_DIR / "bootstrap"
-IS_WINDOWS = "Windows" in platform.system()
-INPUT_QUESTION = "请输入 > "
-
-PyPIMirrorCustom = type("PyPIMirrorCustom", (), {})
-PYPI_MIRRORS = (
-    ("清华大学", "https://pypi.tuna.tsinghua.edu.cn/simple"),
-    ("中国科学技术大学", "https://pypi.mirrors.ustc.edu.cn/simple"),
-    ("阿里云", "https://mirrors.aliyun.com/pypi/simple/"),
-    ("豆瓣", "https://pypi.douban.com/simple/"),
-    ("自定义", PyPIMirrorCustom()),
-    ("不使用镜像源", None),
-)
-
-
-def validate_ip_v_any_addr(addr: str) -> bool:
-    class ValidateModel(BaseModel):
-        addr: IPvAnyAddress
-
-    try:
-        type_validate_python(ValidateModel, {"addr": addr})
-    except ValidationError:
-        return False
-    return True
-
-
-def validate_http_url(url: str) -> bool:
-    class ValidateModel(BaseModel):
-        url: AnyHttpUrl
-
-    try:
-        type_validate_python(ValidateModel, {"url": url})
-    except ValidationError:
-        return False
-    return True
 
 
 def format_project_folder_name(project_name: str) -> str:
@@ -213,7 +178,7 @@ async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["use_run_script"] = use_run_script
-    context.variables["is_windows"] = IS_WINDOWS
+    context.variables["is_windows"] = WINDOWS
 
     redirect_localstore = yes or await ConfirmPrompt(
         "是否将 localstore 插件的存储路径重定向到项目路径下以便于后续迁移 Bot？",
@@ -226,28 +191,6 @@ async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["use_ping"] = use_ping
-
-    has_onebot = "nonebot-adapter-onebot" in context.packages
-    if has_onebot:
-        install_gocqhttp = (
-            False
-            if yes
-            else await ConfirmPrompt(
-                "是否安装 gocqhttp 插件提供内置 GoCQHTTP 启动器？（不推荐）",
-                default_choice=False,
-            ).prompt_async(style=CLI_DEFAULT_STYLE)
-        )
-        if install_gocqhttp:
-            context.packages.append("nonebot-plugin-gocqhttp")
-            context.variables["plugins"].append("nonebot_plugin_gocqhttp")
-
-        install_guild_patch = yes or await ConfirmPrompt(
-            "是否安装 guild-patch 插件提供对 GoCQHTTP 的 QQ 频道支持？",
-            default_choice=True,
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
-        if install_guild_patch:
-            context.packages.append("nonebot-plugin-guild-patch")
-            context.variables["plugins"].append("nonebot_plugin_guild_patch")
 
     install_logpile = yes or await ConfirmPrompt(
         "是否安装 logpile 插件提供日志记录到文件功能？",
@@ -274,15 +217,16 @@ async def prompt_bootstrap_context(context: ProjectContext, yes: bool = False):
     context.variables["plugins"] = json.dumps(context.variables["plugins"])
 
 
-async def configure_web_ui():
+async def configure_web_ui(verbose: bool):
     click.secho("正在为 nb-cli 安装 webui 插件，请稍候", fg="yellow", bold=True)
-    proc = await call_pip_update_no_output(
+    proc = await call_pip_update_simp(
         ["nb-cli-plugin-webui"],
         python_path=sys.executable,
     )
-    if await proc.wait() != 0:
+    code, _, stderr = await wait(proc, verbose=verbose)
+    if code != 0:
         click.secho(
-            f"插件安装失败，请使用 `nb self update nb-cli-plugin-webui` 指令手动安装\n{proc.stderr}",
+            f"插件安装失败，请使用 `nb self update nb-cli-plugin-webui` 指令手动安装\n{stderr}",
             fg="red",
             bold=True,
             err=True,
@@ -295,59 +239,16 @@ async def configure_web_ui():
         "-c",
         "import nb_cli_plugin_webui.app.config",
     )
-    await proc.wait()
+    await wait(proc, verbose=verbose)
 
 
-async def change_pip_mirror():
-    choice = await ListPrompt(
-        "请选择你想要使用的 PyPI 镜像源",
-        [
-            Choice(f"{name} > {url}" if isinstance(url, str) else name, url)
-            for name, url in PYPI_MIRRORS
-        ],
-    ).prompt_async(style=CLI_DEFAULT_STYLE)
-
-    selected = choice.data
-    if isinstance(selected, PyPIMirrorCustom):
-        click.secho("请输入 PyPI 源地址", bold=True)
-        selected_mirror = await InputPrompt(
-            INPUT_QUESTION,
-            validator=validate_http_url,
-            error_message="链接格式不正确！",
-        ).prompt_async(style=CLI_DEFAULT_STYLE)
-    else:
-        selected_mirror = selected
-
-    proc = await call_pip_no_output(["config", "get", "global.index-url"])
-    current_mirror = (
-        (await proc.stdout.read()).decode().strip()
-        if (await proc.wait() == 0) and proc.stdout
-        else None
-    )
-    if selected_mirror:
-        proc = await call_pip_no_output(
-            ["config", "set", "global.index-url", selected_mirror],
-        )
-    elif current_mirror:  # 设置过才执行清空
-        proc = await call_pip_no_output(
-            ["config", "unset", "global.index-url"],
-        )
-    else:
-        proc = None
-    code = await proc.wait() if proc else 0
-
-    if (not proc) or current_mirror == selected_mirror:
-        click.secho("PyPI 源配置未变", fg="yellow", bold=True)
-    elif code == 0:
-        click.secho("PyPI 源配置成功", fg="green", bold=True)
-    else:
-        err = (await proc.stderr.read()).decode() if proc.stderr else ""
-        click.secho(f"PyPI 源配置失败！\n{err}", fg="red", bold=True, err=True)
-
-
-async def post_project_render(context: ProjectContext, yes: bool = False) -> bool:
+async def post_project_render(
+    context: ProjectContext,
+    yes: bool = False,
+    verbose: bool = False,
+) -> bool:
     if context.variables["use_web_ui"]:
-        await configure_web_ui()
+        await configure_web_ui(verbose=verbose)
 
     use_venv = yes or await ConfirmPrompt(
         "是否新建虚拟环境？",
@@ -378,7 +279,7 @@ async def post_project_render(context: ProjectContext, yes: bool = False) -> boo
             default_choice=False,
         ).prompt_async(style=CLI_DEFAULT_STYLE)
     ):
-        await change_pip_mirror()
+        await pip_index_handler(verbose=verbose)
 
     manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
     if (not use_venv) or (
@@ -395,15 +296,16 @@ async def post_project_render(context: ProjectContext, yes: bool = False) -> boo
 
     click.secho("正在安装项目依赖", fg="yellow")
     config_manager = ConfigManager(working_dir=project_dir, use_venv=use_venv)
-    proc = await call_pip_update_no_output(
+    proc = await call_pip_update_simp(
         context.packages,
         python_path=config_manager.python_path,
     )
-    if await proc.wait() == 0:
+    code, _, stderr = await wait(proc, verbose=verbose)
+    if code == 0:
         click.secho("依赖安装成功", fg="green", bold=True)
     else:
         click.secho(
-            f"依赖安装失败，{manually_install_tip}\n{proc.stderr}",
+            f"依赖安装失败，{manually_install_tip}\n{stderr}",
             fg="red",
             bold=True,
             err=True,
@@ -436,14 +338,14 @@ async def post_project_render(context: ProjectContext, yes: bool = False) -> boo
     return True
 
 
-async def bootstrap_handler(*, yes: bool = False):
+async def bootstrap_handler(*, yes: bool = False, verbose: bool = False):
     context = ProjectContext()
     await prompt_bootstrap_context(context, yes=yes)
 
     nb_command_list = [sys.executable, "-m", "nb_cli"]
     context.variables["nb_command"] = (
         subprocess.list2cmdline(nb_command_list)
-        if IS_WINDOWS
+        if WINDOWS
         else " ".join(shlex.quote(x) for x in nb_command_list)
     )
     extra_context = {
@@ -473,7 +375,7 @@ async def bootstrap_handler(*, yes: bool = False):
         bold=True,
     )
 
-    if await post_project_render(context, yes=yes):
+    if await post_project_render(context, yes=yes, verbose=verbose):
         click.secho("项目配置完毕，开始使用吧！", fg="green", bold=True)
     else:
         click.secho(
