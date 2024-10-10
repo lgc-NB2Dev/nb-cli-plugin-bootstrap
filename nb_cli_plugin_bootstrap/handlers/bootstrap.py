@@ -1,4 +1,3 @@
-import asyncio as aio
 import json
 import shlex
 import subprocess
@@ -238,7 +237,11 @@ async def configure_web_ui(verbose: bool):
     proc = await create_process(
         sys.executable,
         "-c",
-        "import nb_cli_plugin_webui.app.config",
+        (
+            "from asyncio import run; "
+            "from nb_cli_plugin_webui.app.config import generate_config; "
+            "run(generate_config())"
+        ),
     )
     await wait(proc, verbose=verbose)
 

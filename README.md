@@ -121,7 +121,7 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ### 0.3.1
 
-- 修复配置 WebUI 报错
+- 修复无法配置 WebUI
 
 ### 0.3.0
 
