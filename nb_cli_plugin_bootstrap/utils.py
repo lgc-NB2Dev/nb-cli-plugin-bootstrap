@@ -125,8 +125,8 @@ async def wait(
         )
     else:
         stdout_b, stderr_b = await proc.communicate()
-        stdout = decode(stdout_b)
-        stderr = decode(stderr_b)
+        stdout = decode(stdout_b or b"")
+        stderr = decode(stderr_b or b"")
     return (await proc.wait(), stdout, stderr)
 
 
