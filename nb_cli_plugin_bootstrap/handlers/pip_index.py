@@ -56,5 +56,5 @@ async def pip_index_handler(verbose: bool = False):
     elif code == 0:
         click.secho("PyPI 源配置成功", fg="green", bold=True)
     else:
-        err = stderr if stderr else ""
+        err = stderr or ""
         click.secho(f"PyPI 源配置失败！\n{err}", fg="red", bold=True, err=True)

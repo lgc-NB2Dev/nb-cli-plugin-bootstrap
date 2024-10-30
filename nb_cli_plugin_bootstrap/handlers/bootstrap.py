@@ -1,8 +1,11 @@
+import asyncio
 import json
+import os
 import shlex
 import subprocess
 import sys
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
@@ -19,7 +22,7 @@ from nb_cli.handlers.adapter import list_adapters
 from nb_cli.handlers.plugin import list_builtin_plugins
 from nb_cli.handlers.process import create_process
 from nb_cli.handlers.venv import create_virtualenv
-from noneprompt import CheckboxPrompt, Choice, ConfirmPrompt, InputPrompt
+from noneprompt import CheckboxPrompt, Choice, ConfirmPrompt, InputPrompt, ListPrompt
 
 from ..const import INPUT_QUESTION
 from ..utils import call_pip_update_simp, validate_ip_v_any_addr, wait
@@ -29,8 +32,62 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BOOTSTRAP_TEMPLATE_DIR = TEMPLATES_DIR / "bootstrap"
 
 
+@dataclass
+class PythonInfo:
+    path: Path
+    version: str
+
+
 def format_project_folder_name(project_name: str) -> str:
     return project_name.replace(" ", "-").lower()
+
+
+async def get_python_version(python_path: Path) -> str:
+    proc = await create_process(
+        python_path,
+        "-c",
+        (
+            "import platform;"
+            "print(f'{platform.python_implementation()} {platform.python_version()}')"
+        ),
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    code, stdout, stderr = await wait(proc)
+    if code == 0 and stdout:
+        return stdout
+    raise RuntimeError(
+        f"Failed to get python version: [{code}] {stderr}, path: {python_path}",
+    )
+
+
+async def find_python() -> List[PythonInfo]:
+    env_path = os.environ["PATH"].split(";" if WINDOWS else ":")
+    python_filenames = ("python.exe",) if WINDOWS else ("python", "python3")
+
+    founded: List[Path] = []
+    for path_str in env_path:
+        path = Path(path_str)
+        for filename in python_filenames:
+            if (p := (path / filename)).exists():
+                founded.append(p)
+                break
+
+    # founded = list(set(founded))
+    if WINDOWS:
+        founded = [x for x in founded if "WindowsApps" not in x.parts]
+    # founded.sort()
+
+    python_versions = await asyncio.gather(
+        *(get_python_version(x) for x in founded),
+        return_exceptions=True,
+    )
+    return [
+        PythonInfo(path, ver)
+        for path, ver in zip(founded, python_versions)
+        if isinstance(ver, str)
+    ]
 
 
 async def prompt_input_list(prompt: str, **kwargs) -> List[str]:
@@ -258,13 +315,43 @@ async def post_project_render(
         "是否新建虚拟环境？",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
+
+    python_infos = await find_python()
+    selected_python = (
+        (
+            python_infos[0].path
+            if len(python_infos) == 1
+            else (
+                await ListPrompt(
+                    question="请选择你想要用来创建虚拟环境的 Python 解释器",
+                    choices=[
+                        Choice(f"{info.version} ({info.path})", info)
+                        for info in python_infos
+                    ],
+                ).prompt_async()
+            ).data.path
+        )
+        if python_infos
+        else None
+    )
+
     project_dir_name = context.variables["project_name"].replace(" ", "-").lower()
     project_dir = Path.cwd() / project_dir_name
     if use_venv:
         venv_dir = project_dir / ".venv"
-        click.secho(f"正在 {venv_dir} 中创建虚拟环境", fg="yellow")
+        click.secho(
+            (
+                f"正在 {venv_dir} 中"
+                f"{f'使用 Python {selected_python} ' if selected_python else ''}创建虚拟环境"
+            ),
+            fg="yellow",
+        )
         try:
-            await create_virtualenv(venv_dir, prompt=project_dir_name)
+            await create_virtualenv(
+                venv_dir,
+                prompt=project_dir_name,
+                python_path=str(selected_python),
+            )
         except Exception:
             click.secho(
                 f"创建虚拟环境失败\n{traceback.format_exc()}",
@@ -286,14 +373,12 @@ async def post_project_render(
         await pip_index_handler(verbose=verbose)
 
     manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
-    if (not use_venv) or (
-        not (
-            yes
-            or await ConfirmPrompt(
-                "是否立即安装项目依赖？",
-                default_choice=True,
-            ).prompt_async(style=CLI_DEFAULT_STYLE)
-        )
+    if not (
+        yes
+        or await ConfirmPrompt(
+            f"是否立即安装项目依赖？{'' if use_venv else '（注意：将会安装到默认全局环境中！）'}",
+            default_choice=True,
+        ).prompt_async(style=CLI_DEFAULT_STYLE)
     ):
         click.secho(manually_install_tip, fg="green")
         return True
