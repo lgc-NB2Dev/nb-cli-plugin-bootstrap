@@ -1,48 +1,47 @@
-from contextlib import suppress
-from pathlib import Path
-from typing import Optional
-
+import subprocess
 import click
-from nb_cli.config import ConfigManager
-from nb_cli.handlers import requires_project_root
-from nb_cli.handlers.meta import _get_env_python
-from poetry.utils.env import VirtualEnv
-from poetry.utils.shell import Shell
+import os
 
-# if not importlib.util.find_spec("poetry"):
-#     raise ImportError(
-#         "Please install `poetry` in nb-cli's environment first, "
-#         "use `nb self install poetry`",
-#     )
-
-
-def find_venv_root(child_path: Path) -> Path:
-    while True:
-        if (child_path / "pyvenv.cfg").exists():
-            return child_path
-        child_path = child_path.parent
-        if len(child_path.parts) <= 1:
-            break
-    raise FileNotFoundError("No virtual environment found")
-
-
-def get_venv_dir(cwd: Optional[Path]) -> Path:
-    config = ConfigManager(working_dir=cwd, use_venv=True)
-    if config.python_path:
-        return find_venv_root(Path(config.python_path).parent)
-    raise FileNotFoundError("No virtual environment found")
-
-
-@requires_project_root
-async def shell_handler(cwd: Optional[Path] = None):
-    venv_path = get_venv_dir(cwd)
-    with suppress(FileNotFoundError):
-        now_venv_path = find_venv_root(Path(await _get_env_python()).parent)
-        if now_venv_path == venv_path:
-            click.secho("您当前已在虚拟环境内", fg="yellow")
-            return
-
-    click.secho(f"进入虚拟环境：{venv_path}", fg="green")
-    venv = VirtualEnv(venv_path)
-    shell = Shell.get()
-    shell.activate(venv)
+async def shell_handler():
+    """Handle 'nb shell' command, print output of 'poetry env activate'."""
+    try:
+        # 获取当前目录
+        current_dir = os.getcwd()
+        
+        # 执行 poetry env activate 命令
+        result = subprocess.run(
+            ["poetry", "env", "activate"],
+            cwd=current_dir,
+            check=True,  # 确保命令执行成功
+            capture_output=True,  # 捕获标准输出和标准错误输出
+            text=True,  # 输出为文本格式
+        )
+        
+        # 获取 poetry env activate 的输出
+        activate_command_output = result.stdout.strip()  # 去除多余的空格和换行
+        
+        # 如果命令输出不为空，高亮显示命令
+        if activate_command_output:
+            click.echo(f"命令: {click.style(activate_command_output, fg='green')}")  # 高亮显示命令
+        
+        # 输出提示信息（另起一行）
+        click.echo(
+            "在新版Poetry中，为了提高兼容性，删去了自动进入Python虚拟环境的代码，所以您需要手动执行上述代码进入Python虚拟环境。"
+            f"本命令 {click.style('nb shell', fg='green')} 与 {click.style('poetry env activate', fg='green')} 等价"
+        )
+        click.echo(
+            f"在Python虚拟环境中，执行：{click.style('deactivate', fg='green')} 可以退出"
+        )
+            
+    except subprocess.CalledProcessError as e:
+        # 如果命令执行失败，捕获异常并输出错误信息
+        click.secho(
+            f"运行 'poetry env activate' 时出错: {e}",
+            fg="red", bold=True, err=True
+        )
+    except Exception as e:
+        # 其他未知错误
+        click.secho(
+            f"发生未知错误: {e}",
+            fg="red", bold=True, err=True
+        )
