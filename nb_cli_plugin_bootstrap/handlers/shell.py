@@ -7,7 +7,7 @@ from nb_cli.config import ConfigManager
 from nb_cli.handlers import requires_project_root
 from nb_cli.handlers.meta import _get_env_python
 from poetry.utils.env import VirtualEnv
-from poetry.utils.shell import Shell
+from poetry.utils.env import EnvCommandError
 
 # if not importlib.util.find_spec("poetry"):
 #     raise ImportError(
