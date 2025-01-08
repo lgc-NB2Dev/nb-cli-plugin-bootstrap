@@ -1,12 +1,7 @@
-from typing import cast
+from typing import Optional, cast
 
 import click
 from nb_cli.cli import ClickAliasedGroup, cli as cli_, run_async
-
-from .handlers.bootstrap import bootstrap_handler
-from .handlers.pip_index import pip_index_handler
-from .handlers.shell import shell_handler
-from .handlers.update_project import update_project_handler
 
 cli = cast(ClickAliasedGroup, cli_)
 
@@ -16,11 +11,34 @@ cli = cast(ClickAliasedGroup, cli_)
     invoke_without_command=True,
     help="创建一个更实用的 NoneBot2 初始项目",
 )
+@click.argument("project-name", required=False, default=None)
 @click.option("-y", "--yes", is_flag=True, help="全部使用默认选项")
 @click.option("-v", "--verbose", is_flag=True, help="显示更多输出")
+@click.option("--venv/--no-venv", default=None, help="指定是否创建虚拟环境")
+@click.option(
+    "-a",
+    "--adapter",
+    multiple=True,
+    default=[],
+    help="指定要安装的适配器名称/包名/模块名",
+)
 @run_async
-async def bootstrap(yes: bool, verbose: bool):
-    await bootstrap_handler(yes=yes, verbose=verbose)
+async def bootstrap(
+    project_name: Optional[str],
+    yes: bool,
+    verbose: bool,
+    venv: Optional[bool],
+    adapter: list[str],
+):
+    from .handlers.bootstrap import bootstrap_handler
+
+    await bootstrap_handler(
+        project_name=project_name,
+        yes=yes,
+        verbose=verbose,
+        venv=venv,
+        adapters=adapter,
+    )
 
 
 @click.group(
@@ -32,6 +50,8 @@ async def bootstrap(yes: bool, verbose: bool):
 @click.option("-v", "--verbose", is_flag=True, help="显示更多输出")
 @run_async
 async def update_project(yes: bool, verbose: bool):
+    from .handlers.update_project import update_project_handler
+
     await update_project_handler(yes=yes, verbose=verbose)
 
 
@@ -43,16 +63,32 @@ async def update_project(yes: bool, verbose: bool):
 @click.option("-v", "--verbose", is_flag=True, help="显示更多输出")
 @run_async
 async def pip_index(verbose: bool):
+    from .handlers.pip_index import pip_index_handler
+
     await pip_index_handler(verbose=verbose)
 
 
 @click.group(
     cls=ClickAliasedGroup,
     invoke_without_command=True,
-    help="进入虚拟环境（需要安装 Poetry）",
+    help="打印进入虚拟环境的命令",
+)
+@run_async
+async def venv():
+    from .handlers.venv import venv_handler
+
+    await venv_handler()
+
+
+@click.group(
+    cls=ClickAliasedGroup,
+    invoke_without_command=True,
+    help="进入虚拟环境（旧版命令兼容）",
 )
 @run_async
 async def shell():
+    from .handlers.shell import shell_handler
+
     await shell_handler()
 
 
@@ -65,6 +101,9 @@ def install():
 
     cli.add_command(pip_index)
     cli.add_aliases("pip-index", ["pi"])
+
+    cli.add_command(venv)
+    cli.add_aliases("venv", ["vv"])
 
     cli.add_command(shell)
     cli.add_aliases("shell", ["sh"])

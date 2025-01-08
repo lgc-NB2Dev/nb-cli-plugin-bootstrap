@@ -2,14 +2,18 @@ import asyncio
 import json
 import locale
 import sys
-from asyncio.subprocess import Process
 from io import StringIO
-from typing import Dict, List, Optional, TextIO, Tuple, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, TextIO, Union
 from typing_extensions import TypeAlias
 
 from nb_cli.compat import type_validate_python
+from nb_cli.handlers import get_default_python
 from nb_cli.handlers.pip import call_pip
 from pydantic import AnyHttpUrl, BaseModel, IPvAnyAddress, ValidationError
+
+if TYPE_CHECKING:
+    from asyncio.subprocess import Process
 
 InstallInfoType: TypeAlias = Union["SuccessInstallInfo", "FailInstallInfo"]
 
@@ -28,10 +32,10 @@ class SuccessInstallInfo:
         return self.packages.get(self.name)
 
     @property
-    def packages_without_self(self) -> Dict[str, str]:
+    def packages_without_self(self) -> dict[str, str]:
         return {k: v for k, v in self.packages.items() if k != self.name}
 
-    def _parse_packages(self) -> Dict[str, str]:
+    def _parse_packages(self) -> dict[str, str]:
         suc_out = "Successfully installed "
         if (out_index := self.stdout.rfind(suc_out)) == -1:
             return {}
@@ -75,12 +79,24 @@ def decode(s: bytes) -> str:
 
 
 async def call_pip_simp(
-    pip_args: List[str],
+    command: str,
+    *pip_args: str,
     python_path: Optional[str] = None,
-) -> Process:
-    return await call_pip(
-        pip_args,
-        python_path=python_path,
+    force_no_uv: bool = False,
+) -> "Process":
+    if (not await uv_exists()) or force_no_uv:
+        return await call_pip(
+            [command, *pip_args],
+            python_path=python_path,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+    if python_path is None:
+        python_path = await get_default_python()
+    return await asyncio.create_subprocess_exec(
+        *("uv", "pip", command, "-p", python_path, *pip_args),
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -88,12 +104,14 @@ async def call_pip_simp(
 
 
 async def call_pip_update_simp(
-    pip_args: List[str],
+    *pip_args: str,
     python_path: Optional[str] = None,
-) -> Process:
+    force_no_uv: bool = False,
+) -> "Process":
     return await call_pip_simp(
-        ["install", "--upgrade", *pip_args],
+        *("install", "--upgrade", *pip_args),
         python_path=python_path,
+        force_no_uv=force_no_uv,
     )
 
 
@@ -117,7 +135,7 @@ async def read_stream(
 async def wait(
     proc: asyncio.subprocess.Process,
     verbose: bool = False,
-) -> Tuple[int, str, str]:
+) -> tuple[int, str, str]:
     if verbose:
         stdout, stderr = await asyncio.gather(
             read_stream(proc.stdout, sys.stdout),
@@ -134,8 +152,8 @@ def normalize_pkg_name(name: str) -> str:
     return name.replace("_", "-").lower()
 
 
-async def list_all_packages(python_path: Optional[str] = None) -> Dict[str, str]:
-    proc = await call_pip_simp(["list", "--format=json"], python_path=python_path)
+async def list_all_packages(python_path: Optional[str] = None) -> dict[str, str]:
+    proc = await call_pip_simp("list", "--format=json", python_path=python_path)
     return_code = await proc.wait()
     if not return_code == 0:
         raise RuntimeError("Failed to execute command `pip list`")
@@ -151,7 +169,7 @@ async def update_package(
 ) -> InstallInfoType:
     if verbose:
         print()
-    proc = await call_pip_update_simp([pkg], python_path=python_path)
+    proc = await call_pip_update_simp(pkg, python_path=python_path)
     return_code, stdout, stderr = await wait(proc, verbose=verbose)
     return (
         SuccessInstallInfo(pkg, stdout, stderr)
@@ -180,3 +198,43 @@ def validate_http_url(url: str) -> bool:
     except ValidationError:
         return False
     return True
+
+
+_uv_exists = False
+
+
+async def uv_exists() -> bool:
+    global _uv_exists
+    if _uv_exists:
+        return True
+
+    try:
+        code = await (
+            await asyncio.create_subprocess_exec(
+                *("uv", "--version"),
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        ).wait()
+    except Exception:
+        return False
+    _uv_exists = code == 0
+    return _uv_exists
+
+
+async def get_uv_python_path() -> Optional[Path]:
+    if not await uv_exists():
+        return None
+    code, stdout, _ = await wait(
+        await asyncio.create_subprocess_exec(
+            *("uv", "python", "dir"),
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        ),
+    )
+    stdout = stdout.strip()
+    if code == 0 and stdout and (p := Path(stdout)).exists():
+        return p
+    return None

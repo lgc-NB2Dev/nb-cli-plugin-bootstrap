@@ -1,1 +1,1 @@
-{{ cookiecutter.nonebot.nb_command }} shell
+start powershell -NoExit -Command "nb venv | Invoke-Expression"

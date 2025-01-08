@@ -1,9 +1,11 @@
+import sys
+
 import click
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
 from noneprompt import Choice, InputPrompt, ListPrompt
 
 from ..const import INPUT_QUESTION
-from ..utils import call_pip_simp, validate_http_url, wait
+from ..utils import call_pip_simp, uv_exists, validate_http_url, wait
 
 PyPIMirrorCustom = type("PyPIMirrorCustom", (), {})
 PYPI_MIRRORS = (
@@ -17,6 +19,10 @@ PYPI_MIRRORS = (
 
 
 async def pip_index_handler(verbose: bool = False):
+    if await uv_exists():
+        click.secho("此功能暂不适用于 uv", fg="yellow")
+        sys.exit(1)
+
     choice = await ListPrompt(
         "请选择你想要对 pip 使用的 PyPI 镜像源",
         [
@@ -36,16 +42,21 @@ async def pip_index_handler(verbose: bool = False):
     else:
         selected_mirror = selected
 
-    proc = await call_pip_simp(["config", "get", "global.index-url"])
+    proc = await call_pip_simp(
+        *("config", "get", "global.index-url"),
+        force_no_uv=True,
+    )
     code, stdout, _ = await wait(proc, verbose=verbose)
     current_mirror = stdout.strip() if (code == 0) else None
     if selected_mirror:
         proc = await call_pip_simp(
-            ["config", "set", "global.index-url", selected_mirror],
+            *("config", "set", "global.index-url", selected_mirror),
+            force_no_uv=True,
         )
     elif current_mirror:  # 设置过才执行清空
         proc = await call_pip_simp(
-            ["config", "unset", "global.index-url"],
+            *("config", "unset", "global.index-url"),
+            force_no_uv=True,
         )
     else:
         proc = None

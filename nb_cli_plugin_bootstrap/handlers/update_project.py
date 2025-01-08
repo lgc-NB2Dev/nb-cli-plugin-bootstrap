@@ -1,5 +1,4 @@
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 import click
 from nb_cli.cli.utils import CLI_DEFAULT_STYLE
@@ -20,11 +19,14 @@ from ..utils import (
     update_package,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 ADAPTER_PKG_PFX = "nonebot.adapters."
 LEN_ADAPTER_PKG_PFX = len(ADAPTER_PKG_PFX)
 
 
-def guess_adapter_pkg_name(module_names: List[str]) -> List[str]:
+def guess_adapter_pkg_name(module_names: list[str]) -> list[str]:
     pkg_names = []
     for name in module_names:
         if name.startswith(ADAPTER_PKG_PFX):
@@ -45,7 +47,7 @@ def style_change(*change: Optional[str]) -> str:
     )
 
 
-def style_change_dict(change: Dict[str, Tuple[Optional[str], Optional[str]]]) -> str:
+def style_change_dict(change: dict[str, tuple[Optional[str], Optional[str]]]) -> str:
     width = max(len(x) for x in change)
     return "\n".join(
         f"  {k.ljust(width)} {style_change(*v)}" for k, v in change.items()
@@ -53,11 +55,11 @@ def style_change_dict(change: Dict[str, Tuple[Optional[str], Optional[str]]]) ->
 
 
 async def summary_infos(
-    infos: List[InstallInfoType],
-    pkgs_before_install: Dict[str, str],
-    pkgs_after_install: Dict[str, str],
+    infos: list[InstallInfoType],
+    pkgs_before_install: dict[str, str],
+    pkgs_after_install: dict[str, str],
 ) -> str:
-    changed_pkgs: Dict[str, Tuple[Optional[str], Optional[str]]] = {
+    changed_pkgs: dict[str, tuple[Optional[str], Optional[str]]] = {
         k: (before, after)
         for k in sorted(set(pkgs_before_install) | set(pkgs_after_install))
         if (
@@ -76,7 +78,7 @@ async def summary_infos(
     }
     changed_others = {k: v for k, v in changed_pkgs.items() if k not in changed_targets}
 
-    info_li: List[str] = []
+    info_li: list[str] = []
     if unchanged_infos:
         unchanged_title = click.style(
             f"版本未变（{len(unchanged_infos)} 个）：",
@@ -120,10 +122,10 @@ async def summary_infos(
 
 # 不能一下子全传进去，否则可能导致依赖冲突
 async def update(
-    packages: List[str],
+    packages: list[str],
     python_path: str,
     verbose: bool = False,
-) -> List[InstallInfoType]:
+) -> list[InstallInfoType]:
     pkg_list_before = await list_all_packages(python_path)
     infos = []
     with click.progressbar(
@@ -157,7 +159,7 @@ async def update_project_handler(
     yes: bool = False,
     verbose: bool = False,
     python_path: Optional[str] = None,
-    cwd: Optional[Path] = None,  # noqa: ARG001
+    cwd: Optional["Path"] = None,  # noqa: ARG001
 ):
     bot_config = get_nonebot_config()
     if python_path is None:

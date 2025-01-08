@@ -30,3 +30,8 @@ elif is_windows:
 else:
     rm_windows_script()
     chmod_linux_script()
+
+
+use_ping = "{{ cookiecutter.nonebot.use_ping }}" == "True"
+if not use_ping:
+    (project_root / "src" / "plugins" / "ping.py").unlink()

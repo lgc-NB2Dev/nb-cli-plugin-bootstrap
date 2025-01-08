@@ -20,8 +20,7 @@
     "nb_command": ""
   },
   "computed": {
-    "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}",
-    "ping_plugin_name": "{% if not cookiecutter.nonebot.use_ping %}_{% endif %}ping"
+    "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}"
   },
   "_extensions": ["nb_cli.extensions.UnJsonifyExtension"]
 }
