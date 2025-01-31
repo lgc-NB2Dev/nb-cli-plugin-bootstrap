@@ -1,1 +1,1 @@
-start powershell -NoExit -Command "nb venv | Invoke-Expression"
+start powershell -NoExit -Command "."""{{ cookiecutter.nonebot.nb_python_path }}""" -m nb_cli venv | Invoke-Expression"

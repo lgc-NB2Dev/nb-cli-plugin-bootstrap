@@ -411,6 +411,7 @@ async def bootstrap_handler(
         adapters=adapters,
     )
 
+    context.variables["nb_python_path"] = sys.executable
     nb_command_list = [sys.executable, "-m", "nb_cli"]
     context.variables["nb_command"] = (
         subprocess.list2cmdline(nb_command_list)

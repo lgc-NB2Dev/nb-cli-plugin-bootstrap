@@ -14,10 +14,10 @@
     "redirect_localstore": true,
     "use_ping": true,
     "use_logpile": true,
-    "use_web_ui": true,
     "plugins": "[]",
     "packages": "[]",
-    "nb_command": ""
+    "nb_python_path": "python",
+    "nb_command": "nb"
   },
   "computed": {
     "project_slug": "{{ cookiecutter.nonebot.project_name.replace(' ', '-') }}"
