@@ -7,7 +7,7 @@ dependencies = [
     "nb-cli>=1.4.2",
     "shellingham>=1.5.4",
     "findpython>=0.6.2",
-    "cookit[pydantic]>=0.8.4",
+    "cookit[pydantic]>=0.9.3",
 ]
 requires-python = ">=3.9,<4.0"
 readme = "README.md"
