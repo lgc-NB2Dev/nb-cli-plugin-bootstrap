@@ -5,7 +5,7 @@ import sys
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 import findpython
@@ -32,6 +32,9 @@ from ..utils import (
     wait,
 )
 from .pip_index import pip_index_handler
+
+if TYPE_CHECKING:
+    from nb_cli.config import Adapter
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BOOTSTRAP_TEMPLATE_DIR = TEMPLATES_DIR / "bootstrap"
@@ -95,10 +98,11 @@ async def prompt_bootstrap_context(
     context.variables["project_name"] = project_name
     context.variables["folder_name"] = format_project_folder_name(project_name)
     context.packages.append("nonebot2[all]")
+
     context.variables["plugins"] = []
 
     if yes or adapters:
-        adapters_info = []
+        adapters_info: list[Adapter] = []
         for adapter_query in adapters or []:
             for a in all_adapters:
                 if (adapter_query.lower() in (a.name.lower(),)) or (
@@ -123,15 +127,15 @@ async def prompt_bootstrap_context(
                 ],
             ).prompt_async(style=CLI_DEFAULT_STYLE)
             if (
-                True
-                if adapter_choices
-                else (
-                    yes
-                    or await ConfirmPrompt(
-                        "你还没有选择任何适配器！适配器是 NoneBot2 对接聊天平台的关键组件！真的要继续吗？",
-                        default_choice=False,
-                    ).prompt_async(style=CLI_DEFAULT_STYLE)
-                )
+                adapter_choices
+                or yes
+                or await ConfirmPrompt(
+                    (
+                        "你还没有选择任何适配器！"
+                        "适配器是 NoneBot2 对接聊天平台的关键组件！真的要继续吗？"
+                    ),
+                    default_choice=False,
+                ).prompt_async(style=CLI_DEFAULT_STYLE)
             ):
                 break
         adapters_info = [a.data for a in adapter_choices]
@@ -149,7 +153,7 @@ async def prompt_bootstrap_context(
             "请输入 Bot 超级用户，超级用户拥有对 Bot 的最高权限（如对接 QQ 填 QQ 号即可）",
         )
     )
-    context.variables["env_superusers"] = json.dumps(env_superusers)
+    context.variables["env_superusers"] = json.dumps(env_superusers, ensure_ascii=False)
 
     env_nickname = (
         []
@@ -158,7 +162,7 @@ async def prompt_bootstrap_context(
             "请输入 Bot 昵称，消息以 Bot 昵称开头可以代替艾特",
         )
     )
-    context.variables["env_nickname"] = json.dumps(env_nickname)
+    context.variables["env_nickname"] = json.dumps(env_nickname, ensure_ascii=False)
 
     default_command_start = ["", "/", "#"]
     env_command_start = (
@@ -172,6 +176,7 @@ async def prompt_bootstrap_context(
     )
     context.variables["env_command_start"] = json.dumps(
         env_command_start or default_command_start,
+        ensure_ascii=False,
     )
 
     default_command_sep = [".", " "]
@@ -179,11 +184,13 @@ async def prompt_bootstrap_context(
         None
         if yes
         else await prompt_input_list(
-            f"请输入 Bot 命令分隔符，一般用于二级指令，\n留空将使用默认值 {default_command_sep}",
+            f"请输入 Bot 命令分隔符，一般用于二级指令，"
+            f"\n留空将使用默认值 {default_command_sep}",
         )
     )
     context.variables["env_command_sep"] = json.dumps(
         env_command_sep or default_command_sep,
+        ensure_ascii=False,
     )
 
     env_host = "127.0.0.1"
@@ -205,7 +212,10 @@ async def prompt_bootstrap_context(
     env_port = "8080"
     if not yes:
         click.secho(
-            "请输入 NoneBot2 监听端口，范围 1 ~ 65535，请保证该端口号与连接端配置相同，或与端口映射配置相关",
+            (
+                "请输入 NoneBot2 监听端口，范围 1 ~ 65535，"
+                "请保证该端口号与连接端配置相同，或与端口映射配置相关"
+            ),
             bold=True,
         )
         env_port = (
@@ -233,7 +243,7 @@ async def prompt_bootstrap_context(
     context.variables["is_windows"] = WINDOWS
 
     redirect_localstore = yes or await ConfirmPrompt(
-        "是否将 localstore 插件的存储路径重定向到项目路径下以便于后续迁移 Bot？",
+        "是否将 localstore 插件的存储路径重定向到项目路径下以便于后续迁移 Bot？（强烈推荐）",
         default_choice=True,
     ).prompt_async(style=CLI_DEFAULT_STYLE)
     context.variables["redirect_localstore"] = redirect_localstore
@@ -256,24 +266,7 @@ async def prompt_bootstrap_context(
     context.variables["plugins"] = json.dumps(context.variables["plugins"])
 
 
-async def post_project_render(
-    context: ProjectContext,
-    yes: bool = False,
-    verbose: bool = False,
-    venv: Optional[bool] = None,
-) -> bool:
-    use_venv = (
-        (
-            yes
-            or await ConfirmPrompt(
-                "是否新建虚拟环境？",
-                default_choice=True,
-            ).prompt_async(style=CLI_DEFAULT_STYLE)
-        )
-        if venv is None
-        else venv
-    )
-
+async def create_venv(project_dir: Path, yes: bool = False) -> bool:
     required_ver = Version(".".join(str(x) for x in REQUIRES_PYTHON))
     finder = findpython.Finder()
     uv_python_path = await get_uv_python_path()
@@ -305,46 +298,73 @@ async def post_project_render(
             ).prompt_async()
         ).data.executable
 
+    venv_dir = project_dir / ".venv"
+    click.secho(
+        (f"正在 {venv_dir} 中使用 Python {selected_python} 创建虚拟环境"),
+        fg="yellow",
+    )
+    try:
+        await create_virtualenv(
+            venv_dir,
+            prompt=project_dir.name,
+            python_path=str(selected_python),
+        )
+    except Exception:
+        click.secho(
+            f"创建虚拟环境失败\n{traceback.format_exc()}",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        return False
+    click.secho("创建虚拟环境成功", fg="green", bold=True)
+    return True
+
+
+async def post_project_render(
+    context: ProjectContext,
+    yes: bool = False,
+    verbose: bool = False,
+    venv: Optional[bool] = None,
+) -> bool:
+    use_venv = (
+        (
+            yes
+            or await ConfirmPrompt(
+                "是否新建虚拟环境？",
+                default_choice=True,
+            ).prompt_async(style=CLI_DEFAULT_STYLE)
+        )
+        if venv is None
+        else venv
+    )
     project_dir_name = context.variables["project_name"].replace(" ", "-").lower()
     project_dir = Path.cwd() / project_dir_name
-    if use_venv:
-        venv_dir = project_dir / ".venv"
-        click.secho(
-            (f"正在 {venv_dir} 中使用 Python {selected_python} 创建虚拟环境"),
-            fg="yellow",
-        )
-        try:
-            await create_virtualenv(
-                venv_dir,
-                prompt=project_dir_name,
-                python_path=str(selected_python),
-            )
-        except Exception:
-            click.secho(
-                f"创建虚拟环境失败\n{traceback.format_exc()}",
-                fg="red",
-                bold=True,
-                err=True,
-            )
-            return False
-        click.secho("创建虚拟环境成功", fg="green", bold=True)
+    if use_venv and (not await create_venv(project_dir, yes)):
+        return False
 
     if (
-        False
-        if yes or (await uv_exists())
-        else await ConfirmPrompt(
+        (not yes)
+        and (not await uv_exists())
+        and await ConfirmPrompt(
             "是否需要修改或清除 pip 的 PyPI 镜像源配置？",
             default_choice=False,
         ).prompt_async(style=CLI_DEFAULT_STYLE)
     ):
         await pip_index_handler(verbose=verbose)
 
-    manually_install_tip = "项目依赖已写入项目 pyproject.toml 中，请自行手动安装，或使用 pdm 等包管理器安装"
-    if not (
-        (use_venv)  # 全默认别装全局环境
+    manually_install_tip = (
+        "项目依赖已写入项目 pyproject.toml 中，"
+        "请自行手动安装，或使用 pdm 等包管理器安装"
+    )
+    if (
+        (not use_venv)
         if yes
-        else await ConfirmPrompt(
-            f"是否立即安装项目依赖？{'' if use_venv else '（注意：将会安装到默认全局环境中！）'}",
+        else not await ConfirmPrompt(
+            (
+                f"是否立即安装项目依赖？"
+                f"{'' if use_venv else '（注意：将会安装到默认全局环境中！）'}"
+            ),
             default_choice=True,
         ).prompt_async(style=CLI_DEFAULT_STYLE)
     ):
