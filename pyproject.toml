@@ -6,10 +6,10 @@ authors = [{ name = "LgCookie", email = "lgc2333@126.com" }]
 dependencies = [
     "nb-cli>=1.4.2",
     "shellingham>=1.5.4",
-    "findpython>=0.6.2",
-    "cookit[pydantic]>=0.9.3",
+    "findpython>=0.7.0",
+    "cookit[pydantic]>=0.13.0",
 ]
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.10,<4.0"
 readme = "README.md"
 license = { text = "MIT" }
 

@@ -2,7 +2,7 @@
 name = "{{ cookiecutter.computed.project_slug }}"
 version = "0.1.0"
 description = "{{ cookiecutter.nonebot.project_name }}"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [{% for pkg in cookiecutter.nonebot.packages %}
     "{{ pkg }}",{% endfor %}
 ]
