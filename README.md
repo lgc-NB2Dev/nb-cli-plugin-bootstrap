@@ -15,8 +15,8 @@
 _✨ NoneBot2 更实用的初始项目新建工具 ✨_
 
 <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="python">
-<a href="https://pdm.fming.dev">
-  <img src="https://img.shields.io/badge/pdm-managed-blueviolet" alt="pdm-managed">
+<a href="https://github.com/astral-sh/uv">
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv">
 </a>
 <a href="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33e5-66c5-4aee-ad15-2d9104d177c4">
   <img src="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/018c33e5-66c5-4aee-ad15-2d9104d177c4.svg" alt="wakatime">
