@@ -19,13 +19,9 @@ homepage = "https://github.com/lgc-NB2Dev/nb-cli-plugin-bootstrap"
 [project.entry-points.nb]
 bootstrap = "nb_cli_plugin_bootstrap.plugin:install"
 
-[tool.pdm.build]
-includes = []
-
-[tool.pdm.version]
-source = "file"
-path = "nb_cli_plugin_bootstrap/__init__.py"
-
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "nb_cli_plugin_bootstrap/__init__.py"
